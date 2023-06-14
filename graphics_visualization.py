@@ -228,50 +228,49 @@ class GraphWidget(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
 
-        node1 = Node(self)
-        node2 = Node(self)
-        node3 = Node(self)
-        node4 = Node(self)
-        node5 = Node(self)
-        node6 = Node(self)
-        node7 = Node(self)
-        node8 = Node(self)
-        node9 = Node(self)
-        scene.addItem(node1)
-        scene.addItem(node2)
-        scene.addItem(node3)
-        scene.addItem(node4)
-        scene.addItem(node5)
-        scene.addItem(node6)
-        scene.addItem(node7)
-        scene.addItem(node8)
-        scene.addItem(node9)
-        scene.addItem(Edge(node1, node2))
-        scene.addItem(Edge(node2, node3))
-        scene.addItem(Edge(node2, node5))
-        scene.addItem(Edge(node3, node6))
-        scene.addItem(Edge(node4, node1))
-        scene.addItem(Edge(node4, node5))
-        scene.addItem(Edge(node5, node6))
-        scene.addItem(Edge(node5, node8))
-        scene.addItem(Edge(node6, node9))
-        scene.addItem(Edge(node7, node4))
-        scene.addItem(Edge(node8, node7))
-        scene.addItem(Edge(node9, node8))
+        nodes = [
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+            Node(self),
+        ]
+        scene.addItem(nodes[0])
+        scene.addItem(nodes[1])
+        scene.addItem(nodes[2])
+        scene.addItem(nodes[3])
+        scene.addItem(nodes[4])
+        scene.addItem(nodes[5])
+        scene.addItem(nodes[6])
+        scene.addItem(nodes[7])
+        scene.addItem(nodes[8])
+        scene.addItem(Edge(nodes[0], nodes[1]))
+        scene.addItem(Edge(nodes[1], nodes[2]))
+        scene.addItem(Edge(nodes[1], nodes[4]))
+        scene.addItem(Edge(nodes[2], nodes[5]))
+        scene.addItem(Edge(nodes[3], nodes[0]))
+        scene.addItem(Edge(nodes[3], nodes[4]))
+        scene.addItem(Edge(nodes[4], nodes[5]))
+        scene.addItem(Edge(nodes[4], nodes[7]))
+        scene.addItem(Edge(nodes[5], nodes[8]))
+        scene.addItem(Edge(nodes[6], nodes[3]))
+        scene.addItem(Edge(nodes[7], nodes[6]))
+        scene.addItem(Edge(nodes[8], nodes[7]))
 
-        node1.setPos(-50, -50)
-        node2.setPos(0, -50)
-        node3.setPos(50, -50)
-        node4.setPos(-50, 0)
-        node5.setPos(0, 0)
-        node6.setPos(50, 0)
-        node7.setPos(-50, 50)
-        node8.setPos(0, 50)
-        node9.setPos(50, 50)
+        self.randomize_nodes()
 
         self.scale(0.8, 0.8)
         self.setMinimumSize(400, 400)
         self.setWindowTitle('Elastic Nodes')
+
+    def randomize_nodes(self):
+        for item in self.scene().items():
+            if isinstance(item, Node):
+                item.setPos(-150 + random(300), -150 + random(300))
 
     def item_moved(self):
         if not self._timer_id:
@@ -285,9 +284,7 @@ class GraphWidget(QGraphicsView):
         elif key == Qt.Key_Minus:
             self.scale_view(1 / 1.2)
         elif key == Qt.Key_Space or key == Qt.Key_Enter:
-            for item in self.scene().items():
-                if isinstance(item, Node):
-                    item.setPos(-150 + random(300), -150 + random(300))
+            self.randomize_nodes()
         else:
             QGraphicsView.keyPressEvent(self, event)
 
