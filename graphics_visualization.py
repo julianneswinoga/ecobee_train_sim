@@ -6,12 +6,9 @@ import sys
 import weakref
 import math
 
-from PySide6.QtCore import (QLineF, QPointF, QRandomGenerator, QRectF, QSizeF,
-                            Qt, qAbs)
-from PySide6.QtGui import (QColor, QBrush, QLinearGradient, QPainter, QPainterPath, QPen,
-                           QPolygonF, QRadialGradient)
-from PySide6.QtWidgets import (QApplication, QGraphicsItem, QGraphicsScene,
-                               QGraphicsView, QStyle)
+from PySide6.QtCore import QLineF, QPointF, QRandomGenerator, QRectF, QSizeF, Qt, qAbs
+from PySide6.QtGui import QColor, QBrush, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF, QRadialGradient
+from PySide6.QtWidgets import QApplication, QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
 
 
 def random(boundary):
@@ -19,7 +16,6 @@ def random(boundary):
 
 
 class Edge(QGraphicsItem):
-
     item_type = QGraphicsItem.UserType + 2
 
     def __init__(self, sourceNode, destNode):
@@ -56,8 +52,7 @@ class Edge(QGraphicsItem):
         if not self.source() or not self.dest():
             return
 
-        line = QLineF(self.mapFromItem(self.source(), 0, 0),
-                      self.mapFromItem(self.dest(), 0, 0))
+        line = QLineF(self.mapFromItem(self.source(), 0, 0), self.mapFromItem(self.dest(), 0, 0))
         length = line.length()
 
         if length == 0.0:
@@ -99,18 +94,24 @@ class Edge(QGraphicsItem):
         if line.dy() >= 0:
             angle = 2 * math.pi - angle
 
-        arrow_head1 = QPointF(math.sin(angle + math.pi / 3) * self._arrow_size,
-                              math.cos(angle + math.pi / 3) * self._arrow_size)
+        arrow_head1 = QPointF(
+            math.sin(angle + math.pi / 3) * self._arrow_size, math.cos(angle + math.pi / 3) * self._arrow_size
+        )
         source_arrow_p1 = self._source_point + arrow_head1
-        arrow_head2 = QPointF(math.sin(angle + math.pi - math.pi / 3) * self._arrow_size,
-                              math.cos(angle + math.pi - math.pi / 3) * self._arrow_size)
+        arrow_head2 = QPointF(
+            math.sin(angle + math.pi - math.pi / 3) * self._arrow_size,
+            math.cos(angle + math.pi - math.pi / 3) * self._arrow_size,
+        )
         source_arrow_p2 = self._source_point + arrow_head2
 
-        arrow_head1 = QPointF(math.sin(angle - math.pi / 3) * self._arrow_size,
-                              math.cos(angle - math.pi / 3) * self._arrow_size)
+        arrow_head1 = QPointF(
+            math.sin(angle - math.pi / 3) * self._arrow_size, math.cos(angle - math.pi / 3) * self._arrow_size
+        )
         dest_arrow_p1 = self._dest_point + arrow_head1
-        arrow_head2 = QPointF(math.sin(angle - math.pi + math.pi / 3) * self._arrow_size,
-                              math.cos(angle - math.pi + math.pi / 3) * self._arrow_size)
+        arrow_head2 = QPointF(
+            math.sin(angle - math.pi + math.pi / 3) * self._arrow_size,
+            math.cos(angle - math.pi + math.pi / 3) * self._arrow_size,
+        )
         dest_arrow_p2 = self._dest_point + arrow_head2
 
         painter.setBrush(Qt.black)
@@ -177,10 +178,8 @@ class Node(QGraphicsItem):
 
         scene_rect = self.scene().sceneRect()
         self._new_pos = self.pos() + QPointF(xvel, yvel)
-        self._new_pos.setX(min(max(self._new_pos.x(), scene_rect.left() + 10),
-                               scene_rect.right() - 10))
-        self._new_pos.setY(min(max(self._new_pos.y(), scene_rect.top() + 10),
-                               scene_rect.bottom() - 10))
+        self._new_pos.setX(min(max(self._new_pos.x(), scene_rect.left() + 10), scene_rect.right() - 10))
+        self._new_pos.setY(min(max(self._new_pos.y(), scene_rect.top() + 10), scene_rect.bottom() - 10))
 
     def advance(self):
         if self._new_pos == self.pos():
@@ -191,8 +190,7 @@ class Node(QGraphicsItem):
 
     def boundingRect(self):
         adjust = 2.0
-        return QRectF(-10 - adjust, -10 - adjust,
-                             23 + adjust, 23 + adjust)
+        return QRectF(-10 - adjust, -10 - adjust, 23 + adjust, 23 + adjust)
 
     def shape(self):
         path = QPainterPath()
@@ -343,14 +341,12 @@ class GraphWidget(QGraphicsView):
     def draw_background(self, painter, rect):
         # Shadow.
         scene_rect = self.sceneRect()
-        right_shadow = QRectF(scene_rect.right(), scene_rect.top() + 5,
-                              5, scene_rect.height())
-        bottom_shadow = QRectF(scene_rect.left() + 5, scene_rect.bottom(),
-                               scene_rect.width(), 5)
+        right_shadow = QRectF(scene_rect.right(), scene_rect.top() + 5, 5, scene_rect.height())
+        bottom_shadow = QRectF(scene_rect.left() + 5, scene_rect.bottom(), scene_rect.width(), 5)
         if right_shadow.intersects(rect) or right_shadow.contains(rect):
-                painter.fillRect(right_shadow, Qt.darkGray)
+            painter.fillRect(right_shadow, Qt.darkGray)
         if bottom_shadow.intersects(rect) or bottom_shadow.contains(rect):
-                painter.fillRect(bottom_shadow, Qt.darkGray)
+            painter.fillRect(bottom_shadow, Qt.darkGray)
 
         # Fill.
         gradient = QLinearGradient(scene_rect.topLeft(), scene_rect.bottomRight())
@@ -361,10 +357,8 @@ class GraphWidget(QGraphicsView):
         painter.drawRect(scene_rect)
 
         # Text.
-        text_rect = QRectF(scene_rect.left() + 4, scene_rect.top() + 4,
-                                 scene_rect.width() - 4, scene_rect.height() - 4)
-        message = self.tr("Click and drag the nodes around, and zoom with the "
-                          "mouse wheel or the '+' and '-' keys")
+        text_rect = QRectF(scene_rect.left() + 4, scene_rect.top() + 4, scene_rect.width() - 4, scene_rect.height() - 4)
+        message = self.tr("Click and drag the nodes around, and zoom with the " "mouse wheel or the '+' and '-' keys")
 
         font = painter.font()
         font.setBold(True)
