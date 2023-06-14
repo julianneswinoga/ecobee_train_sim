@@ -1,13 +1,9 @@
-# Copyright (C) 2013 Riverbank Computing Limited.
-# Copyright (C) 2022 The Qt Company Ltd.
-# SPDX-License-Identifier: LicenseRef-Qt-Commercial OR BSD-3-Clause
-
 import sys
 import weakref
 import math
 
 from PySide6.QtCore import QLineF, QPointF, QRandomGenerator, QRectF, QSizeF, Qt, qAbs
-from PySide6.QtGui import QColor, QBrush, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF, QRadialGradient
+from PySide6.QtGui import QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import QApplication, QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
 
 
@@ -30,9 +26,6 @@ class Edge(QGraphicsItem):
         self.source().add_edge(self)
         self.dest().add_edge(self)
         self.adjust()
-
-    def item_type(self):
-        return Edge.item_type
 
     def source_node(self):
         return self.source()
@@ -133,9 +126,6 @@ class Node(QGraphicsItem):
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setZValue(-1)
 
-    def item_type(self):
-        return Node.item_type
-
     def add_edge(self, edge):
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
@@ -199,21 +189,11 @@ class Node(QGraphicsItem):
 
     def paint(self, painter, option, widget):
         painter.setPen(Qt.NoPen)
-        painter.setBrush(Qt.darkGray)
-        painter.drawEllipse(-7, -7, 20, 20)
-
-        gradient = QRadialGradient(-3, -3, 10)
         if option.state & QStyle.State_Sunken:
-            gradient.setCenter(3, 3)
-            gradient.setFocalPoint(3, 3)
-            gradient.setColorAt(1, QColor(Qt.yellow).lighter(120))
-            gradient.setColorAt(0, QColor(Qt.darkYellow).lighter(120))
+            # Click and drag
+            painter.setBrush(Qt.yellow)
         else:
-            gradient.setColorAt(0, Qt.yellow)
-            gradient.setColorAt(1, Qt.darkYellow)
-
-        painter.setBrush(QBrush(gradient))
-        painter.setPen(QPen(Qt.black, 0))
+            painter.setBrush(Qt.darkGray)
         painter.drawEllipse(-10, -10, 20, 20)
 
     def itemChange(self, change, value):
@@ -252,7 +232,7 @@ class GraphWidget(QGraphicsView):
         node2 = Node(self)
         node3 = Node(self)
         node4 = Node(self)
-        self._center_node = Node(self)
+        node5 = Node(self)
         node6 = Node(self)
         node7 = Node(self)
         node8 = Node(self)
@@ -261,19 +241,19 @@ class GraphWidget(QGraphicsView):
         scene.addItem(node2)
         scene.addItem(node3)
         scene.addItem(node4)
-        scene.addItem(self._center_node)
+        scene.addItem(node5)
         scene.addItem(node6)
         scene.addItem(node7)
         scene.addItem(node8)
         scene.addItem(node9)
         scene.addItem(Edge(node1, node2))
         scene.addItem(Edge(node2, node3))
-        scene.addItem(Edge(node2, self._center_node))
+        scene.addItem(Edge(node2, node5))
         scene.addItem(Edge(node3, node6))
         scene.addItem(Edge(node4, node1))
-        scene.addItem(Edge(node4, self._center_node))
-        scene.addItem(Edge(self._center_node, node6))
-        scene.addItem(Edge(self._center_node, node8))
+        scene.addItem(Edge(node4, node5))
+        scene.addItem(Edge(node5, node6))
+        scene.addItem(Edge(node5, node8))
         scene.addItem(Edge(node6, node9))
         scene.addItem(Edge(node7, node4))
         scene.addItem(Edge(node8, node7))
@@ -283,7 +263,7 @@ class GraphWidget(QGraphicsView):
         node2.setPos(0, -50)
         node3.setPos(50, -50)
         node4.setPos(-50, 0)
-        self._center_node.setPos(0, 0)
+        node5.setPos(0, 0)
         node6.setPos(50, 0)
         node7.setPos(-50, 50)
         node8.setPos(0, 50)
@@ -291,7 +271,7 @@ class GraphWidget(QGraphicsView):
 
         self.scale(0.8, 0.8)
         self.setMinimumSize(400, 400)
-        self.setWindowTitle(self.tr("Elastic Nodes"))
+        self.setWindowTitle('Elastic Nodes')
 
     def item_moved(self):
         if not self._timer_id:
@@ -300,15 +280,7 @@ class GraphWidget(QGraphicsView):
     def keyPressEvent(self, event):
         key = event.key()
 
-        if key == Qt.Key_Up:
-            self._center_node.moveBy(0, -20)
-        elif key == Qt.Key_Down:
-            self._center_node.moveBy(0, 20)
-        elif key == Qt.Key_Left:
-            self._center_node.moveBy(-20, 0)
-        elif key == Qt.Key_Right:
-            self._center_node.moveBy(20, 0)
-        elif key == Qt.Key_Plus:
+        if key == Qt.Key_Plus:
             self.scale_view(1.2)
         elif key == Qt.Key_Minus:
             self.scale_view(1 / 1.2)
@@ -331,43 +303,13 @@ class GraphWidget(QGraphicsView):
                 items_moved = True
 
         if not items_moved:
+            # Stop running update calculations if nothing is moving
             self.killTimer(self._timer_id)
             self._timer_id = 0
 
     def wheelEvent(self, event):
         delta = event.angleDelta().y()
         self.scale_view(math.pow(2.0, -delta / 240.0))
-
-    def draw_background(self, painter, rect):
-        # Shadow.
-        scene_rect = self.sceneRect()
-        right_shadow = QRectF(scene_rect.right(), scene_rect.top() + 5, 5, scene_rect.height())
-        bottom_shadow = QRectF(scene_rect.left() + 5, scene_rect.bottom(), scene_rect.width(), 5)
-        if right_shadow.intersects(rect) or right_shadow.contains(rect):
-            painter.fillRect(right_shadow, Qt.darkGray)
-        if bottom_shadow.intersects(rect) or bottom_shadow.contains(rect):
-            painter.fillRect(bottom_shadow, Qt.darkGray)
-
-        # Fill.
-        gradient = QLinearGradient(scene_rect.topLeft(), scene_rect.bottomRight())
-        gradient.setColorAt(0, Qt.white)
-        gradient.setColorAt(1, Qt.lightGray)
-        painter.fillRect(rect.intersected(scene_rect), QBrush(gradient))
-        painter.setBrush(Qt.NoBrush)
-        painter.drawRect(scene_rect)
-
-        # Text.
-        text_rect = QRectF(scene_rect.left() + 4, scene_rect.top() + 4, scene_rect.width() - 4, scene_rect.height() - 4)
-        message = self.tr("Click and drag the nodes around, and zoom with the " "mouse wheel or the '+' and '-' keys")
-
-        font = painter.font()
-        font.setBold(True)
-        font.setPointSize(14)
-        painter.setFont(font)
-        painter.setPen(Qt.lightGray)
-        painter.drawText(text_rect.translated(2, 2), message)
-        painter.setPen(Qt.black)
-        painter.drawText(text_rect, message)
 
     def scale_view(self, scaleFactor):
         factor = self.transform().scale(scaleFactor, scaleFactor).mapRect(QRectF(0, 0, 1, 1)).width()
