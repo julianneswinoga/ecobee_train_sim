@@ -2,6 +2,12 @@
 
 import argparse
 import logging
+import sys
+
+from PySide6.QtWidgets import QApplication
+import networkx as nx
+
+from graphics_visualization import GraphWidget
 
 parser = argparse.ArgumentParser(
     # TODO: program description
@@ -19,7 +25,17 @@ parser.add_argument(
 
 
 def main():
-    log.info('main()')
+    log.debug('Creating QApplication')
+    app = QApplication()
+
+    G = nx.lollipop_graph(5, 3)
+
+    log.debug('Creating GraphWidget')
+    widget = GraphWidget(nx.to_dict_of_dicts(G))
+    widget.show()
+
+    log.debug('Executing QApplication')
+    sys.exit(app.exec())
 
 
 if __name__ == '__main__':
@@ -29,5 +45,5 @@ if __name__ == '__main__':
         datefmt='%m/%d/%Y %I:%M:%S%p',
         level=args.log_level,
     )
-    log = logging.getLogger('pkgStats')
+    log = logging.getLogger('main')
     main()

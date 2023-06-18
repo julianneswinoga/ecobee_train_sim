@@ -1,17 +1,20 @@
-import sys
 import weakref
 import math
+import logging
+from typing import Dict, List
 
 from PySide6.QtCore import QLineF, QPointF, QRandomGenerator, QRectF, QSizeF, Qt, qAbs
 from PySide6.QtGui import QPainter, QPainterPath, QPen, QPolygonF
-from PySide6.QtWidgets import QApplication, QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
+from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
+
+log = logging.getLogger('graphics_visualization')
 
 
 def random(boundary):
     return QRandomGenerator.global_().bounded(boundary)
 
 
-class Edge(QGraphicsItem):
+class QtEdge(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 2
 
     def __init__(self, sourceNode, destNode):
@@ -112,7 +115,7 @@ class Edge(QGraphicsItem):
         painter.drawPolygon(QPolygonF([line.p2(), dest_arrow_p1, dest_arrow_p2]))
 
 
-class Node(QGraphicsItem):
+class QtNode(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 1
 
     def __init__(self, graphWidget):
@@ -142,7 +145,7 @@ class Node(QGraphicsItem):
         xvel = 0.0
         yvel = 0.0
         for item in self.scene().items():
-            if not isinstance(item, Node):
+            if not isinstance(item, QtNode):
                 continue
 
             line = QLineF(self.mapFromItem(item, 0, 0), QPointF(0, 0))
@@ -214,7 +217,7 @@ class Node(QGraphicsItem):
 
 
 class GraphWidget(QGraphicsView):
-    def __init__(self):
+    def __init__(self, graph_data: Dict[int, Dict]):
         super().__init__()
 
         self._timer_id = 0
@@ -228,38 +231,24 @@ class GraphWidget(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
 
-        nodes = [
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-            Node(self),
-        ]
-        scene.addItem(nodes[0])
-        scene.addItem(nodes[1])
-        scene.addItem(nodes[2])
-        scene.addItem(nodes[3])
-        scene.addItem(nodes[4])
-        scene.addItem(nodes[5])
-        scene.addItem(nodes[6])
-        scene.addItem(nodes[7])
-        scene.addItem(nodes[8])
-        scene.addItem(Edge(nodes[0], nodes[1]))
-        scene.addItem(Edge(nodes[1], nodes[2]))
-        scene.addItem(Edge(nodes[1], nodes[4]))
-        scene.addItem(Edge(nodes[2], nodes[5]))
-        scene.addItem(Edge(nodes[3], nodes[0]))
-        scene.addItem(Edge(nodes[3], nodes[4]))
-        scene.addItem(Edge(nodes[4], nodes[5]))
-        scene.addItem(Edge(nodes[4], nodes[7]))
-        scene.addItem(Edge(nodes[5], nodes[8]))
-        scene.addItem(Edge(nodes[6], nodes[3]))
-        scene.addItem(Edge(nodes[7], nodes[6]))
-        scene.addItem(Edge(nodes[8], nodes[7]))
+        log.debug(f'Creating graphics representation of:\n{graph_data}')
+
+        # First need to add all create a QtNode for every node id
+        nodes: Dict[int, QtNode] = {}
+        for node_start_id in graph_data.keys():
+            nodes[node_start_id] = QtNode(self)
+
+        # Then we can go through and create a QtEdge containing two QtNodes
+        edges: List[QtEdge] = []
+        for node_start_id, edge_connection_dict in graph_data.items():
+            for node_end_id, edge_data in edge_connection_dict.items():
+                edges.append(QtEdge(nodes[node_start_id], nodes[node_end_id]))
+
+        # Then we add all the QtNodes and QtEdges to the scene
+        for node in nodes.values():
+            scene.addItem(node)
+        for edge in edges:
+            scene.addItem(edge)
 
         self.randomize_nodes()
 
@@ -269,7 +258,7 @@ class GraphWidget(QGraphicsView):
 
     def randomize_nodes(self):
         for item in self.scene().items():
-            if isinstance(item, Node):
+            if isinstance(item, QtNode):
                 item.setPos(-150 + random(300), -150 + random(300))
 
     def item_moved(self):
@@ -289,7 +278,7 @@ class GraphWidget(QGraphicsView):
             QGraphicsView.keyPressEvent(self, event)
 
     def timerEvent(self, event):
-        nodes = [item for item in self.scene().items() if isinstance(item, Node)]
+        nodes = [item for item in self.scene().items() if isinstance(item, QtNode)]
 
         for node in nodes:
             node.calculate_forces()
@@ -315,12 +304,3 @@ class GraphWidget(QGraphicsView):
             return
 
         self.scale(scaleFactor, scaleFactor)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    widget = GraphWidget()
-    widget.show()
-
-    sys.exit(app.exec())
