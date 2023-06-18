@@ -1,51 +1,49 @@
 import weakref
 import math
 import logging
+import random
 from typing import Dict, List
 
-from PySide6.QtCore import QLineF, QPointF, QRandomGenerator, QRectF, QSizeF, Qt, qAbs
+from PySide6.QtCore import QLineF, QPointF, QRectF, QSizeF, Qt, qAbs
 from PySide6.QtGui import QPainter, QPainterPath, QPen, QPolygonF
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
 
 log = logging.getLogger('graphics_visualization')
 
 
-def random(boundary):
-    return QRandomGenerator.global_().bounded(boundary)
-
-
 class QtEdge(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 2
 
-    def __init__(self, sourceNode, destNode):
+    def __init__(self, source_node: 'QtNode', dest_node: 'QtNode'):
         super().__init__()
 
         self._arrow_size = 10.0
         self._source_point = QPointF()
         self._dest_point = QPointF()
         self.setAcceptedMouseButtons(Qt.NoButton)
-        self.source = weakref.ref(sourceNode)
-        self.dest = weakref.ref(destNode)
+        self.source: weakref.ReferenceType[QtNode] = weakref.ref(source_node)
+        self.dest: weakref.ReferenceType[QtNode] = weakref.ref(dest_node)
         self.source().add_edge(self)
         self.dest().add_edge(self)
         self.adjust()
 
-    def source_node(self):
+    def source_node(self) -> weakref.ReferenceType['QtNode']:
         return self.source()
 
-    def set_source_node(self, node):
+    def set_source_node(self, node: 'QtNode'):
         self.source = weakref.ref(node)
         self.adjust()
 
-    def dest_node(self):
+    def dest_node(self) -> weakref.ReferenceType['QtNode']:
         return self.dest()
 
-    def set_dest_node(self, node):
+    def set_dest_node(self, node: 'QtNode'):
         self.dest = weakref.ref(node)
         self.adjust()
 
     def adjust(self):
         if not self.source() or not self.dest():
+            log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node to adjust')
             return
 
         line = QLineF(self.mapFromItem(self.source(), 0, 0), self.mapFromItem(self.dest(), 0, 0))
@@ -62,6 +60,7 @@ class QtEdge(QGraphicsItem):
 
     def boundingRect(self):
         if not self.source() or not self.dest():
+            log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Empty bounding rectangle')
             return QRectF()
 
         pen_width = 1
@@ -74,6 +73,7 @@ class QtEdge(QGraphicsItem):
 
     def paint(self, painter, option, widget):
         if not self.source() or not self.dest():
+            log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
 
         # Draw the line itself.
@@ -118,11 +118,11 @@ class QtEdge(QGraphicsItem):
 class QtNode(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 1
 
-    def __init__(self, graphWidget):
+    def __init__(self, graph_widget: 'GraphWidget'):
         super().__init__()
 
-        self.graph = weakref.ref(graphWidget)
-        self._edge_list = []
+        self.graph = weakref.ref(graph_widget)
+        self._edge_list: List[weakref.ReferenceType[QtEdge]] = []
         self._new_pos = QPointF()
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
@@ -133,7 +133,7 @@ class QtNode(QGraphicsItem):
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
 
-    def edges(self):
+    def edges(self) -> List[weakref.ReferenceType[QtEdge]]:
         return self._edge_list
 
     def calculate_forces(self):
@@ -259,7 +259,7 @@ class GraphWidget(QGraphicsView):
     def randomize_nodes(self):
         for item in self.scene().items():
             if isinstance(item, QtNode):
-                item.setPos(-150 + random(300), -150 + random(300))
+                item.setPos(-150 + random.randint(0, 300), -150 + random.randint(0, 300))
 
     def item_moved(self):
         if not self._timer_id:
@@ -297,10 +297,10 @@ class GraphWidget(QGraphicsView):
         delta = event.angleDelta().y()
         self.scale_view(math.pow(2.0, -delta / 240.0))
 
-    def scale_view(self, scaleFactor):
-        factor = self.transform().scale(scaleFactor, scaleFactor).mapRect(QRectF(0, 0, 1, 1)).width()
+    def scale_view(self, scale_factor: float):
+        factor = self.transform().scale(scale_factor, scale_factor).mapRect(QRectF(0, 0, 1, 1)).width()
 
         if factor < 0.07 or factor > 100:
             return
 
-        self.scale(scaleFactor, scaleFactor)
+        self.scale(scale_factor, scale_factor)
