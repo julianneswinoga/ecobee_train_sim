@@ -5,7 +5,7 @@ import random
 from typing import Dict, List
 
 from PySide6.QtCore import QLineF, QPointF, QRectF, QSizeF, Qt, qAbs
-from PySide6.QtGui import QPainter, QPainterPath, QPen, QPolygonF
+from PySide6.QtGui import QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
 
 log = logging.getLogger('graphics_visualization')
@@ -17,7 +17,6 @@ class QtEdge(QGraphicsItem):
     def __init__(self, source_node: 'QtNode', dest_node: 'QtNode'):
         super().__init__()
 
-        self._arrow_size = 10.0
         self._source_point = QPointF()
         self._dest_point = QPointF()
         self.setAcceptedMouseButtons(Qt.NoButton)
@@ -64,7 +63,7 @@ class QtEdge(QGraphicsItem):
             return QRectF()
 
         pen_width = 1
-        extra = (pen_width + self._arrow_size) / 2.0
+        extra = pen_width / 2.0
 
         width = self._dest_point.x() - self._source_point.x()
         height = self._dest_point.y() - self._source_point.y()
@@ -76,43 +75,9 @@ class QtEdge(QGraphicsItem):
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
 
-        # Draw the line itself.
-        line = QLineF(self._source_point, self._dest_point)
-
-        if line.length() == 0.0:
-            return
-
         painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        line = QLineF(self._source_point, self._dest_point)
         painter.drawLine(line)
-
-        # Draw the arrows if there's enough room.
-        angle = math.acos(line.dx() / line.length())
-        if line.dy() >= 0:
-            angle = 2 * math.pi - angle
-
-        arrow_head1 = QPointF(
-            math.sin(angle + math.pi / 3) * self._arrow_size, math.cos(angle + math.pi / 3) * self._arrow_size
-        )
-        source_arrow_p1 = self._source_point + arrow_head1
-        arrow_head2 = QPointF(
-            math.sin(angle + math.pi - math.pi / 3) * self._arrow_size,
-            math.cos(angle + math.pi - math.pi / 3) * self._arrow_size,
-        )
-        source_arrow_p2 = self._source_point + arrow_head2
-
-        arrow_head1 = QPointF(
-            math.sin(angle - math.pi / 3) * self._arrow_size, math.cos(angle - math.pi / 3) * self._arrow_size
-        )
-        dest_arrow_p1 = self._dest_point + arrow_head1
-        arrow_head2 = QPointF(
-            math.sin(angle - math.pi + math.pi / 3) * self._arrow_size,
-            math.cos(angle - math.pi + math.pi / 3) * self._arrow_size,
-        )
-        dest_arrow_p2 = self._dest_point + arrow_head2
-
-        painter.setBrush(Qt.black)
-        painter.drawPolygon(QPolygonF([line.p1(), source_arrow_p1, source_arrow_p2]))
-        painter.drawPolygon(QPolygonF([line.p2(), dest_arrow_p1, dest_arrow_p2]))
 
 
 class QtNode(QGraphicsItem):
