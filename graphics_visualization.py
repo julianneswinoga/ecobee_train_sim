@@ -88,6 +88,7 @@ class QtNode(QGraphicsItem):
         self.graph = weakref.ref(graph_widget)
         self._edge_list: List[weakref.ReferenceType[QtEdge]] = []
         self._new_pos = QPointF()
+        self.bounds = QRectF()
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
@@ -146,8 +147,7 @@ class QtNode(QGraphicsItem):
         return True
 
     def boundingRect(self):
-        adjust = 2.0
-        return QRectF(-10 - adjust, -10 - adjust, 23 + adjust, 23 + adjust)
+        return self.bounds
 
     def shape(self):
         path = QPainterPath()
@@ -161,7 +161,17 @@ class QtNode(QGraphicsItem):
             painter.setBrush(Qt.yellow)
         else:
             painter.setBrush(Qt.darkGray)
-        painter.drawEllipse(-10, -10, 20, 20)
+        ellipse_bounds = QRectF(-10, -10, 20, 20)
+        painter.drawEllipse(ellipse_bounds)
+
+        text = 'test'
+        painter.setPen(QPen(Qt.black))
+        text_bounds = painter.fontMetrics().boundingRect(text)
+        text_bounds.moveTo(ellipse_bounds.center().toPoint())
+        # text_bounds.setWidth(500)  # TODO: Sometimes fontMetrics.boundingRect returns an incorrect width?
+        painter.drawText(text_bounds, text)
+
+        self.bounds = ellipse_bounds.united(text_bounds)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange:
