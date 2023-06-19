@@ -19,6 +19,7 @@ class QtEdge(QGraphicsItem):
 
         self._source_point = QPointF()
         self._dest_point = QPointF()
+        self.bounds = QRectF()
         self.setAcceptedMouseButtons(Qt.NoButton)
         self.source: weakref.ReferenceType[QtNode] = weakref.ref(source_node)
         self.dest: weakref.ReferenceType[QtNode] = weakref.ref(dest_node)
@@ -58,17 +59,7 @@ class QtEdge(QGraphicsItem):
         self._dest_point = line.p2() - edge_offset
 
     def boundingRect(self):
-        if not self.source() or not self.dest():
-            log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Empty bounding rectangle')
-            return QRectF()
-
-        pen_width = 1
-        extra = pen_width / 2.0
-
-        width = self._dest_point.x() - self._source_point.x()
-        height = self._dest_point.y() - self._source_point.y()
-        rect = QRectF(self._source_point, QSizeF(width, height))
-        return rect.normalized().adjusted(-extra, -extra, extra, extra)
+        return self.bounds
 
     def paint(self, painter, option, widget):
         if not self.source() or not self.dest():
@@ -78,6 +69,14 @@ class QtEdge(QGraphicsItem):
         painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         line = QLineF(self._source_point, self._dest_point)
         painter.drawLine(line)
+        line_bounds = QRectF(line.p1(), line.p2()).normalized()
+
+        text = 'test'
+        text_bounds = painter.fontMetrics().boundingRect(text)
+        text_bounds.moveTo(line_bounds.center().toPoint())
+        painter.drawText(text_bounds, 0, text)
+
+        self.bounds = line_bounds.united(text_bounds)
 
 
 class QtNode(QGraphicsItem):
