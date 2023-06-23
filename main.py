@@ -57,7 +57,7 @@ def main():
             base_junction.set_forks(fork1, fork2)
 
     log.debug('Creating GraphWidget')
-    widget = GraphWidget(nx.to_dict_of_dicts(G))
+    widget = GraphWidget('Train Simulation', nx.to_dict_of_dicts(G))
     widget.show()
 
     log.debug('Executing QApplication')

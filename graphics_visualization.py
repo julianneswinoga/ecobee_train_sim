@@ -251,7 +251,7 @@ class QtJunction(QtNode):
 
 
 class GraphWidget(QGraphicsView):
-    def __init__(self, graph_data: Dict[SimObject, Dict]):
+    def __init__(self, window_title: str, graph_data: Dict[SimObject, Dict]):
         super().__init__()
 
         self._timer_id = 0
@@ -295,7 +295,7 @@ class GraphWidget(QGraphicsView):
 
         self.scale(0.8, 0.8)
         self.setMinimumSize(400, 400)
-        self.setWindowTitle('Elastic Nodes')
+        self.setWindowTitle(window_title)
 
     def randomize_nodes(self):
         for item in self.scene().items():
