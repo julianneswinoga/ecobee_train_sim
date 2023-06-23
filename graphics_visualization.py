@@ -13,18 +13,11 @@ from simulation_model import SimObject, Train, Signal, Junction
 log = logging.getLogger('graphics_visualization')
 
 
-class DrawableSimobject(QGraphicsItem):
-    def __init__(self, sim_obj: SimObject):
-        super().__init__()
-
-        self.sim_obj = sim_obj
-
-
-class QtEdge(DrawableSimobject):
+class QtEdge(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 2
 
-    def __init__(self, source_node: 'QtNode', dest_node: 'QtNode', sim_obj: SimObject):
-        super().__init__(sim_obj)
+    def __init__(self, source_node: 'QtNode', dest_node: 'QtNode'):
+        super().__init__()
 
         self._source_point = QPointF()
         self._dest_point = QPointF()
@@ -70,7 +63,7 @@ class QtEdge(DrawableSimobject):
     def boundingRect(self):
         return self.bounds
 
-    def paint_edge(self, painter, option):
+    def paint(self, painter, option, widget):
         if not self.source() or not self.dest():
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
@@ -85,23 +78,15 @@ class QtEdge(DrawableSimobject):
         text_bounds.moveTo(line_bounds.center().toPoint())
         painter.drawText(text_bounds, 0, text)
 
-        return line_bounds.united(text_bounds)
-
-    def paint(self, painter, option, widget):
-        if self.sim_obj is None:  # TODO: FIX
-            self.bounds = self.paint_edge(painter, option)
-        else:
-            log.error(f'Cannot paint Edge simobject: {self.sim_obj}')
-            self.bounds = QRectF(0, 0, 0, 0)
+        self.bounds = line_bounds.united(text_bounds)
 
 
-class QtNode(DrawableSimobject):
+class QtNode(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 1
 
-    def __init__(self, graph_widget: 'GraphWidget', sim_obj: SimObject):
-        super().__init__(sim_obj)
+    def __init__(self, graph_widget: 'GraphWidget'):
+        super().__init__()
 
-        self.fork_qt_notes: Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]] = None
         self.graph = weakref.ref(graph_widget)
         self._edge_list: List[weakref.ReferenceType[QtEdge]] = []
         self._new_pos = QPointF()
@@ -111,36 +96,9 @@ class QtNode(DrawableSimobject):
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setZValue(-1)
 
-    def update_fork_nodes(self):
-        if not isinstance(self.sim_obj, Junction):
-            log.error(f'Not a Junction, no fork nodes')
-            return
-        if self.sim_obj.fork_connections is None:
-            return
-
-        # Find the two edges from the fork identifiers
-        qt_node_fork1, qt_node_fork2 = None, None
-        for qt_edge in self._edge_list:
-            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
-            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
-            if edge_node1.sim_obj.ident == self.sim_obj.fork_connections[0]:
-                qt_node_fork1 = edge_node1
-            if edge_node2.sim_obj.ident == self.sim_obj.fork_connections[1]:
-                qt_node_fork2 = edge_node2
-            if qt_node_fork1 is not None and qt_node_fork2 is not None:
-                break
-        if qt_node_fork1 is None or qt_node_fork2 is None:
-            # Forks not found, no update
-            return
-        self.fork_qt_notes = (qt_node_fork1, qt_node_fork2)
-
     def add_edge(self, edge):
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
-
-        if isinstance(self.sim_obj, Junction):
-            # Update our fork references if we're a Junction,
-            self.update_fork_nodes()
 
     def edges(self) -> List[weakref.ReferenceType[QtEdge]]:
         return self._edge_list
@@ -198,11 +156,67 @@ class QtNode(DrawableSimobject):
         path.addEllipse(-10, -10, 20, 20)
         return path
 
-    def paint_junction(self, painter, option) -> QRectF:
-        if not isinstance(self.sim_obj, Junction):
-            log.error(f'paint_junction should not be called outside paint function')
-            return QRectF(0, 0, 0, 0)
+    def paint(self, painter, option, widget):
+        # Basic circle
+        painter.setPen(Qt.NoPen)
+        if option.state & QStyle.State_Sunken:
+            # Click and drag
+            painter.setBrush(Qt.yellow)
+        else:
+            painter.setBrush(Qt.darkGray)
+        ellipse_bounds = QRectF(-10, -10, 20, 20)
+        painter.drawEllipse(ellipse_bounds)
+        self.bounds = ellipse_bounds
 
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.ItemPositionChange:
+            for edge in self._edge_list:
+                edge().adjust()
+            self.graph().item_moved()
+
+        return QGraphicsItem.itemChange(self, change, value)
+
+    def mousePressEvent(self, event):
+        self.update()
+        QGraphicsItem.mousePressEvent(self, event)
+
+    def mouseReleaseEvent(self, event):
+        self.update()
+        QGraphicsItem.mouseReleaseEvent(self, event)
+
+
+class QtJunction(QtNode):
+    def __init__(self, graph_widget: 'GraphWidget', junction: Junction):
+        super().__init__(graph_widget)
+        self.junction = junction
+        self.fork_qt_notes: Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]] = None
+
+    def update_fork_nodes(self):
+        if self.junction.fork_connections is None:
+            return
+
+        # Find the two edges from the fork identifiers
+        qt_node_fork1, qt_node_fork2 = None, None
+        for qt_edge in self._edge_list:
+            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
+            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
+            if edge_node1.junction.ident == self.junction.fork_connections[0]:
+                qt_node_fork1 = edge_node1
+            if edge_node2.junction.ident == self.junction.fork_connections[1]:
+                qt_node_fork2 = edge_node2
+            if qt_node_fork1 is not None and qt_node_fork2 is not None:
+                break
+        if qt_node_fork1 is None or qt_node_fork2 is None:
+            # Forks not found, no update
+            return
+        self.fork_qt_notes = (qt_node_fork1, qt_node_fork2)
+
+    def add_edge(self, edge):
+        super().add_edge(edge)
+        # Update our fork references if we're a Junction,
+        self.update_fork_nodes()
+
+    def paint(self, painter, option, widget):
         # Draw circle
         painter.setPen(Qt.NoPen)
         if option.state & QStyle.State_Sunken:
@@ -214,7 +228,7 @@ class QtNode(DrawableSimobject):
         painter.drawEllipse(ellipse_bounds)
 
         # Draw text
-        text = f'Junction({self.sim_obj.ident})'
+        text = f'Junction({self.junction.ident})'
         painter.setPen(QPen(Qt.black))
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(ellipse_bounds.center().toPoint())
@@ -233,31 +247,7 @@ class QtNode(DrawableSimobject):
             painter.drawLine(line2)
 
         # calculate item bounds
-        junction_bounds = ellipse_bounds.united(text_bounds)
-        return junction_bounds
-
-    def paint(self, painter, option, widget):
-        if isinstance(self.sim_obj, Junction):
-            self.bounds = self.paint_junction(painter, option)
-        else:
-            log.error(f'Cannot paint Node simobject: {self.sim_obj}')
-            self.bounds = QRectF(0, 0, 0, 0)
-
-    def itemChange(self, change, value):
-        if change == QGraphicsItem.ItemPositionChange:
-            for edge in self._edge_list:
-                edge().adjust()
-            self.graph().item_moved()
-
-        return QGraphicsItem.itemChange(self, change, value)
-
-    def mousePressEvent(self, event):
-        self.update()
-        QGraphicsItem.mousePressEvent(self, event)
-
-    def mouseReleaseEvent(self, event):
-        self.update()
-        QGraphicsItem.mouseReleaseEvent(self, event)
+        self.bounds = ellipse_bounds.united(text_bounds)
 
 
 class GraphWidget(QGraphicsView):
@@ -280,14 +270,20 @@ class GraphWidget(QGraphicsView):
         # First need to add all create a QtNode for every node id
         nodes: Dict[SimObject, QtNode] = {}
         for node_start_obj in graph_data.keys():
-            nodes[node_start_obj] = QtNode(self, node_start_obj)
+            # Convert simulation types into graphics types
+            if isinstance(node_start_obj, Junction):
+                node = QtJunction(self, node_start_obj)
+            else:
+                log.warning(f'Unknown node type: {node_start_obj}')
+                node = QtNode(self)
+            nodes[node_start_obj] = node
 
         # Then we can go through and create a QtEdge containing two QtNodes
         edges: List[QtEdge] = []
         for node_start_obj, edge_connection_dict in graph_data.items():
             for node_end_obj, edge_data in edge_connection_dict.items():
                 # TODO: Figure out how to pass simulation edge data here
-                edges.append(QtEdge(nodes[node_start_obj], nodes[node_end_obj], None))
+                edges.append(QtEdge(nodes[node_start_obj], nodes[node_end_obj]))
 
         # Then we add all the QtNodes and QtEdges to the scene
         for node in nodes.values():
