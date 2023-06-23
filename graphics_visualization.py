@@ -4,11 +4,12 @@ import logging
 import random
 from typing import Dict, List, Optional, Tuple
 
-from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs
+import networkx as nx
+from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
 from PySide6.QtGui import QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
 
-from simulation_model import SimObject, Train, Signal, Junction
+from simulation_model import SimObject, Train, Track, Junction, Simulation
 
 log = logging.getLogger('graphics_visualization')
 
@@ -73,7 +74,31 @@ class QtEdge(QGraphicsItem):
         painter.drawLine(line)
         line_bounds = QRectF(line.p1(), line.p2()).normalized()
 
-        text = f'NONE'
+        self.bounds = line_bounds
+
+
+class QtTrack(QtEdge):
+    def __init__(self, source_junction: 'QtNode', dest_junction: 'QtNode', track: Track):
+        super().__init__(source_junction, dest_junction)
+
+        self.track = track
+
+    def paint(self, painter, option, widget):
+        if not self.source() or not self.dest():
+            log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
+            return
+
+        painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+        line = QLineF(self._source_point, self._dest_point)
+        painter.drawLine(line)
+        line_bounds = QRectF(line.p1(), line.p2()).normalized()
+
+        if self.track.train:
+            text = f'Track({self.track.ident}) {self.track.train}'
+            painter.setPen(Qt.red)
+        else:
+            text = f'Track({self.track.ident})'
+            painter.setPen(Qt.black)
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(line_bounds.center().toPoint())
         painter.drawText(text_bounds, 0, text)
@@ -192,17 +217,15 @@ class QtJunction(QtNode):
         self.fork_qt_notes: Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]] = None
 
     def update_fork_nodes(self):
-        if self.junction.fork_connections is None:
-            return
-
         # Find the two edges from the fork identifiers
         qt_node_fork1, qt_node_fork2 = None, None
         for qt_edge in self._edge_list:
             edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
             edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
-            if edge_node1.junction.ident == self.junction.fork_connections[0]:
+            switch_junct1, switch_junct2 = self.junction.get_switch_state()
+            if edge_node1.junction == switch_junct1:
                 qt_node_fork1 = edge_node1
-            if edge_node2.junction.ident == self.junction.fork_connections[1]:
+            if edge_node2.junction == switch_junct2:
                 qt_node_fork2 = edge_node2
             if qt_node_fork1 is not None and qt_node_fork2 is not None:
                 break
@@ -251,10 +274,13 @@ class QtJunction(QtNode):
 
 
 class GraphWidget(QGraphicsView):
-    def __init__(self, window_title: str, graph_data: Dict[SimObject, Dict]):
+    def __init__(self, window_title: str, simulation: Simulation):
         super().__init__()
 
         self._timer_id = 0
+        self.simulation_timer = QTimer(self)
+        self.simulation_timer.timeout.connect(self.advance_simulation)
+        self.simulation_timer.start(5000)
 
         scene = QGraphicsScene(self)
         scene.setItemIndexMethod(QGraphicsScene.NoIndex)
@@ -264,6 +290,10 @@ class GraphWidget(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+
+        self.simulation = simulation
+
+        graph_data = nx.to_dict_of_dicts(self.simulation.graph)
 
         log.debug(f'Creating graphics representation of:\n{graph_data}')
 
@@ -282,10 +312,16 @@ class GraphWidget(QGraphicsView):
         edges: List[QtEdge] = []
         for node_start_obj, edge_connection_dict in graph_data.items():
             for node_end_obj, edge_data in edge_connection_dict.items():
-                # TODO: Figure out how to pass simulation edge data here
-                edges.append(QtEdge(nodes[node_start_obj], nodes[node_end_obj]))
+                # Convert simulation types into graphics types
+                edge_obj = edge_data['object']
+                if isinstance(edge_obj, Track):
+                    edge = QtTrack(nodes[node_start_obj], nodes[node_end_obj], edge_obj)
+                else:
+                    log.warning(f'Unknown edge type: {edge_obj}')
+                    edge = QtEdge(nodes[node_start_obj], nodes[node_end_obj])
+                edges.append(edge)
 
-        # Then we add all the QtNodes and QtEdges to the scene
+        # Then we add all the Qt objects to the scene
         for node in nodes.values():
             scene.addItem(node)
         for edge in edges:
@@ -296,6 +332,13 @@ class GraphWidget(QGraphicsView):
         self.scale(0.8, 0.8)
         self.setMinimumSize(400, 400)
         self.setWindowTitle(window_title)
+
+    def advance_simulation(self):
+        self.simulation.advance()
+        # Update all the fork nodes in case any junctions switched
+        for item in self.scene().items():
+            if isinstance(item, QtJunction):
+                item.update_fork_nodes()
 
     def randomize_nodes(self):
         for item in self.scene().items():

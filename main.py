@@ -9,7 +9,7 @@ from PySide6.QtWidgets import QApplication
 import networkx as nx
 
 from graphics_visualization import GraphWidget
-from simulation_model import Train, Signal, Junction, Simulation
+from simulation_model import Train, Track, Junction, Simulation
 
 parser = argparse.ArgumentParser(
     # TODO: program description
@@ -30,19 +30,24 @@ def main():
     log.debug('Creating QApplication')
     app = QApplication()
 
+    # Create the graph representation
+    log.debug('Creating graph')
     graph = nx.Graph()
-    junctions = [Junction() for _ in range(6)]
-    graph.add_edge(junctions[0], junctions[1])
-    graph.add_edge(junctions[1], junctions[2])
-    graph.add_edge(junctions[1], junctions[3])
-    graph.add_edge(junctions[3], junctions[4])
-    graph.add_edge(junctions[3], junctions[5])
+    junctions = [Junction() for _ in range(7)]
+    graph.add_edge(junctions[0], junctions[1], object=Track())
+    graph.add_edge(junctions[1], junctions[2], object=Track())
+    graph.add_edge(junctions[1], junctions[3], object=Track())
+    graph.add_edge(junctions[3], junctions[5], object=Track())
+    graph.add_edge(junctions[3], junctions[4], object=Track())
+    graph.add_edge(
+        junctions[4], junctions[6], object=Track(Train(dest_junction=junctions[0], facing_junction=junctions[4]))
+    )
 
-    # Create the simulation
+    log.debug('Creating simulation')
     sim = Simulation(graph)
 
     log.debug('Creating GraphWidget')
-    widget = GraphWidget('Train Simulation', nx.to_dict_of_dicts(sim.graph))
+    widget = GraphWidget('Train Simulation', sim)
     widget.show()
 
     log.debug('Executing QApplication')
