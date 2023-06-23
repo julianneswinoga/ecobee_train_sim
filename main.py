@@ -34,7 +34,9 @@ def main():
     log.debug('Creating graph')
     graph = nx.Graph()
     junctions = [Junction() for _ in range(7)]
-    graph.add_edge(junctions[0], junctions[1], object=Track())
+    graph.add_edge(
+        junctions[0], junctions[1], object=Track(Train(dest_junction=junctions[6], facing_junction=junctions[1]))
+    )
     graph.add_edge(junctions[1], junctions[2], object=Track())
     graph.add_edge(junctions[1], junctions[3], object=Track())
     graph.add_edge(junctions[3], junctions[5], object=Track())

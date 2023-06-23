@@ -261,7 +261,6 @@ class QtJunction(QtNode):
         # Draw fork
         if self.fork_qt_notes is not None:
             qt_node_fork1, qt_node_fork2 = self.fork_qt_notes
-            # TODO: Need to repaint whenever forks change position
             line1 = QLineF(self.mapFromItem(qt_node_fork1, QPointF(0, 0)), QPointF(0, 0))
             line2 = QLineF(self.mapFromItem(qt_node_fork2, QPointF(0, 0)), QPointF(0, 0))
             # Lines will be cut off at the item bounds, no need to rescale them
@@ -362,6 +361,10 @@ class GraphWidget(QGraphicsView):
             QGraphicsView.keyPressEvent(self, event)
 
     def timerEvent(self, event):
+        # Just repaint everything for now. Don't really want to optimize the logic
+        for item in self.scene().items():
+            item.update()
+
         nodes = [item for item in self.scene().items() if isinstance(item, QtNode)]
 
         for node in nodes:
