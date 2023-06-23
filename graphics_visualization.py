@@ -101,6 +101,7 @@ class QtNode(DrawableSimobject):
     def __init__(self, graph_widget: 'GraphWidget', sim_obj: SimObject):
         super().__init__(sim_obj)
 
+        self.fork_qt_notes: Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]] = None
         self.graph = weakref.ref(graph_widget)
         self._edge_list: List[weakref.ReferenceType[QtEdge]] = []
         self._new_pos = QPointF()
@@ -110,9 +111,36 @@ class QtNode(DrawableSimobject):
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setZValue(-1)
 
+    def update_fork_nodes(self):
+        if not isinstance(self.sim_obj, Junction):
+            log.error(f'Not a Junction, no fork nodes')
+            return
+        if self.sim_obj.fork_connections is None:
+            return
+
+        # Find the two edges from the fork identifiers
+        qt_node_fork1, qt_node_fork2 = None, None
+        for qt_edge in self._edge_list:
+            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
+            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
+            if edge_node1.sim_obj.ident == self.sim_obj.fork_connections[0]:
+                qt_node_fork1 = edge_node1
+            if edge_node2.sim_obj.ident == self.sim_obj.fork_connections[1]:
+                qt_node_fork2 = edge_node2
+            if qt_node_fork1 is not None and qt_node_fork2 is not None:
+                break
+        if qt_node_fork1 is None or qt_node_fork2 is None:
+            # Forks not found, no update
+            return
+        self.fork_qt_notes = (qt_node_fork1, qt_node_fork2)
+
     def add_edge(self, edge):
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
+
+        if isinstance(self.sim_obj, Junction):
+            # Update our fork references if we're a Junction,
+            self.update_fork_nodes()
 
     def edges(self) -> List[weakref.ReferenceType[QtEdge]]:
         return self._edge_list
@@ -170,24 +198,6 @@ class QtNode(DrawableSimobject):
         path.addEllipse(-10, -10, 20, 20)
         return path
 
-    def find_qt_nodes_from_fork_idents(
-        self, fork_ident1, fork_ident2
-    ) -> Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]]:
-        # Find the two edges from the fork identifiers
-        qt_node_fork1, qt_node_fork2 = None, None
-        for qt_edge in self._edge_list:
-            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
-            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
-            if edge_node1.sim_obj.ident == fork_ident1:
-                qt_node_fork1 = edge_node1
-            if edge_node2.sim_obj.ident == fork_ident2:
-                qt_node_fork2 = edge_node2
-            if qt_node_fork1 is not None and qt_node_fork2 is not None:
-                break
-        if qt_node_fork1 is None or qt_node_fork2 is None:
-            return None
-        return qt_node_fork1, qt_node_fork2
-
     def paint_junction(self, painter, option) -> QRectF:
         if not isinstance(self.sim_obj, Junction):
             log.error(f'paint_junction should not be called outside paint function')
@@ -212,20 +222,15 @@ class QtNode(DrawableSimobject):
         painter.drawText(text_bounds, text)
 
         # Draw fork
-        if self.sim_obj.fork_connections is not None:
-            fork_ident1, fork_ident2 = self.sim_obj.fork_connections
-            fork_tup = self.find_qt_nodes_from_fork_idents(fork_ident1, fork_ident2)
-            if fork_tup:
-                qt_node_fork1, qt_node_fork2 = fork_tup
-                # TODO: Need to repaint whenever forks change position
-                line1 = QLineF(self.mapFromItem(qt_node_fork1, QPointF(0, 0)), QPointF(0, 0))
-                line2 = QLineF(self.mapFromItem(qt_node_fork2, QPointF(0, 0)), QPointF(0, 0))
-                # Lines will be cut off at the item bounds, no need to rescale them
-                painter.setPen(QPen(Qt.red))
-                painter.drawLine(line1)
-                painter.drawLine(line2)
-            else:
-                log.error(f'Could not find forks for {self.sim_obj.ident}: {fork_ident1}, {fork_ident2}')
+        if self.fork_qt_notes is not None:
+            qt_node_fork1, qt_node_fork2 = self.fork_qt_notes
+            # TODO: Need to repaint whenever forks change position
+            line1 = QLineF(self.mapFromItem(qt_node_fork1, QPointF(0, 0)), QPointF(0, 0))
+            line2 = QLineF(self.mapFromItem(qt_node_fork2, QPointF(0, 0)), QPointF(0, 0))
+            # Lines will be cut off at the item bounds, no need to rescale them
+            painter.setPen(QPen(Qt.red))
+            painter.drawLine(line1)
+            painter.drawLine(line2)
 
         # calculate item bounds
         junction_bounds = ellipse_bounds.united(text_bounds)
