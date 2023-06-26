@@ -1,2 +1,3 @@
 PySide6-Essentials==6.5.1.1
+pyqtgraph==0.13.3
 NetworkX==3.1

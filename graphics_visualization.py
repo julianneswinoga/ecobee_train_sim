@@ -2,7 +2,7 @@ import weakref
 import math
 import logging
 import random
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QHBoxLayout,
 )
+from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes, interact
 
 from simulation_model import SimObject, Train, Track, Junction, Simulation
 
@@ -286,9 +287,6 @@ class GraphWidget(QGraphicsView):
         super().__init__()
 
         self._timer_id = 0
-        self.simulation_timer = QTimer(self)
-        self.simulation_timer.timeout.connect(self.advance_simulation)
-        self.simulation_timer.start(5000)
 
         scene = QGraphicsScene(self)
         scene.setItemIndexMethod(QGraphicsScene.NoIndex)
@@ -339,12 +337,13 @@ class GraphWidget(QGraphicsView):
 
         self.scale(0.8, 0.8)
 
-    def advance_simulation(self):
+    def advance_simulation(self) -> int:
         self.simulation.advance()
         # Update all the fork nodes in case any junctions switched
         for item in self.scene().items():
             if isinstance(item, QtJunction):
                 item.update_fork_nodes()
+        return self.simulation.step
 
     def randomize_nodes(self):
         for item in self.scene().items():
@@ -406,8 +405,53 @@ class MainWidget(QWidget):
 
         self.graph_widget = GraphWidget(simulation)
 
+        param_root = Parameter.create(name='param_root', type='group')
+        self.param_one_step = parameterTypes.ActionParameter(name='One Step')
+        self.param_run_cont = parameterTypes.SimpleParameter(name='Run Continuous', type='bool', default=False)
+        self.param_update_delay = parameterTypes.SliderParameter(
+            name='Update Delay [ms]', limits=[100, 10000], default=1000, step=50
+        )
+        self.param_update_delay.setValue(1000)  # TODO: Why does this not happen by default?
+        self.param_sim_step_idx = parameterTypes.SimpleParameter(
+            name='Simulation Step', type='int', default=0, readonly=True
+        )
+        param_root.addChild(self.param_one_step)
+        param_root.addChild(self.param_run_cont)
+        param_root.addChild(self.param_update_delay)
+        param_root.addChild(self.param_sim_step_idx)
+        param_tree = ParameterTree()
+        param_tree.setParameters(param_root, showTop=False)
+
+        param_root.sigTreeStateChanged.connect(self.param_change)
+
+        self.simulation_timer = QTimer(self)
+        self.simulation_timer.timeout.connect(self.step_simulation)
+
         self.h_layout = QHBoxLayout(self)
-        self.h_layout.addWidget(self.graph_widget)
+        self.h_layout.addWidget(param_tree, 1)
+        self.h_layout.addWidget(self.graph_widget, 3)
+
+    def param_change(self, param_root: Parameter, changes: List[Tuple[Parameter, str, Any]]):
+        log.debug(f'Parameter changes:{changes}')
+        for param, change, data in changes:
+            if param == self.param_one_step:
+                self.step_simulation()
+            elif param == self.param_run_cont:
+                if data == True:
+                    self.simulation_timer.setInterval(self.param_update_delay.value())
+                    self.simulation_timer.start()
+                else:
+                    self.simulation_timer.stop()
+            elif param == self.param_update_delay:
+                self.simulation_timer.setInterval(self.param_update_delay.value())
+            elif param == self.param_sim_step_idx:
+                pass  # Only updated internally
+            else:
+                log.error(f'Unknown parameter change:{param}')
+
+    def step_simulation(self):
+        sim_step_idx = self.graph_widget.advance_simulation()
+        self.param_sim_step_idx.setValue(sim_step_idx)
 
 
 class MainWindow(QMainWindow):
