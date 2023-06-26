@@ -3,12 +3,10 @@
 import argparse
 import logging
 import sys
-from typing import Dict
 
-from PySide6.QtWidgets import QApplication
 import networkx as nx
 
-from graphics_visualization import GraphWidget
+from graphics_visualization import MainApp
 from simulation_model import Train, Track, Junction, Simulation
 
 parser = argparse.ArgumentParser(
@@ -27,9 +25,6 @@ parser.add_argument(
 
 
 def main():
-    log.debug('Creating QApplication')
-    app = QApplication()
-
     # Create the graph representation
     log.debug('Creating graph')
     graph = nx.Graph()
@@ -48,12 +43,10 @@ def main():
     log.debug('Creating simulation')
     sim = Simulation(graph)
 
-    log.debug('Creating GraphWidget')
-    widget = GraphWidget('Train Simulation', sim)
-    widget.show()
-
-    log.debug('Executing QApplication')
-    sys.exit(app.exec())
+    log.debug('Creating MainApp')
+    main_app = MainApp('Train Simulation', sim)
+    log.debug('Running app')
+    sys.exit(main_app.run())
 
 
 if __name__ == '__main__':

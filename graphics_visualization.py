@@ -7,7 +7,16 @@ from typing import Dict, List, Optional, Tuple
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
 from PySide6.QtGui import QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QGraphicsItem, QGraphicsScene, QGraphicsView, QStyle
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QGraphicsItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QStyle,
+    QHBoxLayout,
+)
 
 from simulation_model import SimObject, Train, Track, Junction, Simulation
 
@@ -273,7 +282,7 @@ class QtJunction(QtNode):
 
 
 class GraphWidget(QGraphicsView):
-    def __init__(self, window_title: str, simulation: Simulation):
+    def __init__(self, simulation: Simulation):
         super().__init__()
 
         self._timer_id = 0
@@ -329,8 +338,6 @@ class GraphWidget(QGraphicsView):
         self.randomize_nodes()
 
         self.scale(0.8, 0.8)
-        self.setMinimumSize(400, 400)
-        self.setWindowTitle(window_title)
 
     def advance_simulation(self):
         self.simulation.advance()
@@ -391,3 +398,37 @@ class GraphWidget(QGraphicsView):
             return
 
         self.scale(scale_factor, scale_factor)
+
+
+class MainWidget(QWidget):
+    def __init__(self, simulation: Simulation):
+        super().__init__()
+
+        self.graph_widget = GraphWidget(simulation)
+
+        self.h_layout = QHBoxLayout(self)
+        self.h_layout.addWidget(self.graph_widget)
+
+
+class MainWindow(QMainWindow):
+    def __init__(self, window_title: str, simulation: Simulation):
+        super().__init__()
+
+        self.setMinimumSize(400, 400)
+        self.setWindowTitle(window_title)
+
+        log.debug('Creating MainWidget')
+        self.main_widget = MainWidget(simulation)
+        self.setCentralWidget(self.main_widget)
+
+
+class MainApp:
+    def __init__(self, window_title: str, simulation: Simulation):
+        log.debug('Creating QApplication')
+        self.app = QApplication()
+        self.main_window = MainWindow(window_title, simulation)
+
+    def run(self) -> int:
+        self.main_window.show()
+        retcode = self.app.exec()
+        return retcode
