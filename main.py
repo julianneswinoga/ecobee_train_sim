@@ -36,10 +36,10 @@ def main():
     graph.add_edge(junctions[1], junctions[3], object=Track())
     graph.add_edge(junctions[3], junctions[5], object=Track())
     graph.add_edge(junctions[3], junctions[4], object=Track())
+    graph.add_edge(junctions[4], junctions[6], object=Track())
     graph.add_edge(
-        junctions[4], junctions[6], object=Track(Train(dest_junction=junctions[5], facing_junction=junctions[4]))
+        junctions[2], junctions[4], object=Track(Train(dest_junction=junctions[5], facing_junction=junctions[2]))
     )
-    graph.add_edge(junctions[2], junctions[4], object=Track())
 
     log.debug('Creating simulation')
     sim = Simulation(graph)

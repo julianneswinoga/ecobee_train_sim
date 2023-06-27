@@ -69,23 +69,7 @@ class Simulation:
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
             if track.train:
-                train = track.train
-                log.debug(f'Finding routes from {train.facing_junction} to {train.dest_junction}')
-                train_path: List[Junction] = nx.shortest_path(
-                    self.graph, source=train.facing_junction, target=train.dest_junction
-                )
-                path_edge_tuples: List[Tuple[Junction, Junction]] = [(train_path.pop(0), train_path.pop(0))]
-                while True:
-                    try:
-                        next_junction = train_path.pop(0)
-                        next_edge = (path_edge_tuples[-1][1], next_junction)
-                        path_edge_tuples.append(next_edge)
-                    except IndexError:
-                        break
-                path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
-                log.info(f'{train}\'s path is {path_tracks}')
-                for path_track in path_tracks:
-                    path_track.lines.add(train)
+                self.set_track_route_for_train(track.train)
 
         # set switch states
         junctions = self.graph.nodes
@@ -104,6 +88,24 @@ class Simulation:
             else:  # Multiple paths, default to first two
                 switch_tup = (adj_junctions[0], adj_junctions[1])
             junction.set_switch_state(*switch_tup)
+
+    def set_track_route_for_train(self, train: Train):
+        log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
+        train_path: List[Junction] = nx.shortest_path(
+            self.graph, source=train.facing_junction, target=train.dest_junction
+        )
+        path_edge_tuples: List[Tuple[Junction, Junction]] = [(train_path.pop(0), train_path.pop(0))]
+        while True:
+            try:
+                next_junction = train_path.pop(0)
+                next_edge = (path_edge_tuples[-1][1], next_junction)
+                path_edge_tuples.append(next_edge)
+            except IndexError:
+                break
+        path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
+        log.info(f'{train}\'s path is {path_tracks}')
+        for path_track in path_tracks:
+            path_track.lines.add(train)
 
     def advance(self):
         log.debug(f'Advancing simulation. step={self.step}')
