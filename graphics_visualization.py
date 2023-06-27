@@ -271,9 +271,10 @@ class QtJunction(QtNode):
         # Draw fork
         if self.fork_qt_notes is not None:
             qt_node_fork1, qt_node_fork2 = self.fork_qt_notes
-            line1 = QLineF(self.mapFromItem(qt_node_fork1, QPointF(0, 0)), QPointF(0, 0))
-            line2 = QLineF(self.mapFromItem(qt_node_fork2, QPointF(0, 0)), QPointF(0, 0))
-            # Lines will be cut off at the item bounds, no need to rescale them
+            line1 = QLineF(QPointF(0, 0), self.mapFromItem(qt_node_fork1, QPointF(0, 0)))
+            line2 = QLineF(QPointF(0, 0), self.mapFromItem(qt_node_fork2, QPointF(0, 0)))
+            line1.setLength(10)  # TODO: Generalize node size
+            line2.setLength(10)
             painter.setPen(QPen(Qt.red))
             painter.drawLine(line1)
             painter.drawLine(line2)
@@ -437,7 +438,7 @@ class MainWidget(QWidget):
             if param == self.param_one_step:
                 self.step_simulation()
             elif param == self.param_run_cont:
-                if data == True:
+                if data is True:
                     self.simulation_timer.setInterval(self.param_update_delay.value())
                     self.simulation_timer.start()
                 else:
