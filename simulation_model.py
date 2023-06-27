@@ -33,7 +33,7 @@ class Track(SimObject):
     def __init__(self, train: Optional[Train] = None):
         super().__init__()
         self.train: Optional[Train] = train
-        self.lines: Set[Train] = set()
+        self.trains_routed_along_track: Set[Train] = set()
 
 
 class Junction(SimObject):
@@ -91,6 +91,8 @@ class Simulation:
 
     def set_track_route_for_train(self, train: Train):
         log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
+
+        # Find the tracks that lie along the shortest path
         train_path: List[Junction] = nx.shortest_path(
             self.graph, source=train.facing_junction, target=train.dest_junction
         )
@@ -104,8 +106,10 @@ class Simulation:
                 break
         path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
         log.info(f'{train}\'s path is {path_tracks}')
+
+        # Tell the tracks about the route
         for path_track in path_tracks:
-            path_track.lines.add(train)
+            path_track.trains_routed_along_track.add(train)
 
     def advance(self):
         log.debug(f'Advancing simulation. step={self.step}')

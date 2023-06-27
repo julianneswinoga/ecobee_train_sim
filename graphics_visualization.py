@@ -121,13 +121,13 @@ class QtTrack(QtEdge):
         painter.drawLine(connecting_line)
         line_bounds = QRectF(connecting_line.p1(), connecting_line.p2()).normalized()
 
-        # Draw the train lines
+        # Draw the train routes
         track_line_bounds = []
         connecting_line_unit_normal = connecting_line.unitVector().normalVector()
-        for i, train_line in enumerate(self.track.lines, start=1):
+        for i, train_line in enumerate(self.track.trains_routed_along_track, start=1):
             # Create copy of normal line
             offset_line = QLineF(connecting_line_unit_normal.p1(), connecting_line_unit_normal.p2())
-            offset_line.setLength(i * 1.0)  # normal offset increases with more track lines
+            offset_line.setLength(i * 1.0)  # normal offset increases with more track routes
             track_line_bounds.append(QRectF(offset_line.p1(), offset_line.p2()).normalized())
             offset_line_delta_point = QPointF(offset_line.dx(), offset_line.dy())
 
