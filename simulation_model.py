@@ -105,10 +105,10 @@ class Simulation:
         while True:
             try:
                 next_junction = train_path.pop(0)
-                next_edge = (path_edge_tuples[-1][1], next_junction)
-                path_edge_tuples.append(next_edge)
             except IndexError:
-                break
+                break  # No more junctions in the path
+            next_edge = (path_edge_tuples[-1][1], next_junction)
+            path_edge_tuples.append(next_edge)
         path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
         log.info(f'{train}\'s path is {path_tracks}')
 
