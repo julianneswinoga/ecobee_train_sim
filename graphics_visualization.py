@@ -87,6 +87,23 @@ class QtEdge(QGraphicsItem):
         self.bounds = line_bounds
 
 
+track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
+next_colour_idx: int = 0
+all_track_line_colours = [Qt.green, Qt.blue, Qt.darkYellow]
+
+
+def get_track_line_colour(track_line: Train) -> Qt.GlobalColor:
+    global track_line_colour_lookup
+    try:
+        return track_line_colour_lookup[track_line]
+    except KeyError:
+        global next_colour_idx
+        next_colour = all_track_line_colours[next_colour_idx]
+        track_line_colour_lookup[track_line] = next_colour
+        next_colour_idx += 1
+        return next_colour
+
+
 class QtTrack(QtEdge):
     def __init__(self, source_junction: 'QtNode', dest_junction: 'QtNode', track: Track):
         super().__init__(source_junction, dest_junction)
@@ -98,14 +115,35 @@ class QtTrack(QtEdge):
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
 
+        # Draw the main connecting line (black line between nodes)
         painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        line = QLineF(self._source_point, self._dest_point)
-        painter.drawLine(line)
-        line_bounds = QRectF(line.p1(), line.p2()).normalized()
+        connecting_line = QLineF(self._source_point, self._dest_point)
+        painter.drawLine(connecting_line)
+        line_bounds = QRectF(connecting_line.p1(), connecting_line.p2()).normalized()
 
+        # Draw the train lines
+        track_line_bounds = []
+        connecting_line_unit_normal = connecting_line.unitVector().normalVector()
+        for i, train_line in enumerate(self.track.lines, start=1):
+            # Create copy of normal line
+            offset_line = QLineF(connecting_line_unit_normal.p1(), connecting_line_unit_normal.p2())
+            offset_line.setLength(i * 1.0)  # normal offset increases with more track lines
+            track_line_bounds.append(QRectF(offset_line.p1(), offset_line.p2()).normalized())
+            offset_line_delta_point = QPointF(offset_line.dx(), offset_line.dy())
+
+            # Create copy of connecting line
+            track_line = QLineF(connecting_line.p1(), connecting_line.p2())
+            # Translate it by the offset line delta
+            track_line.translate(offset_line_delta_point)
+            track_colour = get_track_line_colour(train_line)
+            painter.setPen(QPen(track_colour, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawLine(track_line)
+            track_line_bounds.append(QRectF(track_line.p1(), track_line.p2()).normalized())
+
+        # Draw text
         if self.track.train:
             text = f'Track({self.track.ident}) {self.track.train}'
-            painter.setPen(Qt.red)
+            painter.setPen(get_track_line_colour(self.track.train))
         else:
             text = f'Track({self.track.ident})'
             painter.setPen(Qt.black)
@@ -113,7 +151,10 @@ class QtTrack(QtEdge):
         text_bounds.moveTo(line_bounds.center().toPoint())
         painter.drawText(text_bounds, 0, text)
 
-        self.bounds = line_bounds.united(text_bounds)
+        total_bounds = line_bounds.united(text_bounds)
+        for track_line_bound in track_line_bounds:
+            total_bounds = total_bounds.united(track_line_bound)
+        self.bounds = total_bounds
 
 
 class QtNode(QGraphicsItem):
@@ -344,7 +385,19 @@ class GraphWidget(QGraphicsView):
         for item in self.scene().items():
             if isinstance(item, QtJunction):
                 item.update_fork_nodes()
+        # Force repaint
+        self.repaint_all(force_paint=True)
         return self.simulation.step
+
+    def repaint_all(self, force_paint=False):
+        if force_paint:
+            self.repaint()
+            self.scene().update()
+        for item in self.scene().items():
+            item.update()
+        if force_paint:
+            self.repaint()
+            self.scene().update()
 
     def randomize_nodes(self):
         for item in self.scene().items():
@@ -369,8 +422,7 @@ class GraphWidget(QGraphicsView):
 
     def timerEvent(self, event):
         # Just repaint everything for now. Don't really want to optimize the logic
-        for item in self.scene().items():
-            item.update()
+        self.repaint_all()
 
         nodes = [item for item in self.scene().items() if isinstance(item, QtNode)]
 

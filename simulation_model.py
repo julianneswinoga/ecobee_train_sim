@@ -1,5 +1,5 @@
 import logging
-from typing import Optional, Tuple, List, Dict
+from typing import Optional, Tuple, List, Dict, Set, Generator
 
 import networkx as nx
 
@@ -33,6 +33,7 @@ class Track(SimObject):
     def __init__(self, train: Optional[Train] = None):
         super().__init__()
         self.train: Optional[Train] = train
+        self.lines: Set[Train] = set()
 
 
 class Junction(SimObject):
@@ -64,6 +65,28 @@ class Simulation:
         self._initial_property_setup()
 
     def _initial_property_setup(self):
+        # Find routes for trains
+        for edge_tup in self.graph.edges:
+            track: Track = self.graph.edges[edge_tup]['object']
+            if track.train:
+                train = track.train
+                log.debug(f'Finding routes from {train.facing_junction} to {train.dest_junction}')
+                train_path: List[Junction] = nx.shortest_path(
+                    self.graph, source=train.facing_junction, target=train.dest_junction
+                )
+                path_edge_tuples: List[Tuple[Junction, Junction]] = [(train_path.pop(0), train_path.pop(0))]
+                while True:
+                    try:
+                        next_junction = train_path.pop(0)
+                        next_edge = (path_edge_tuples[-1][1], next_junction)
+                        path_edge_tuples.append(next_edge)
+                    except IndexError:
+                        break
+                path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
+                log.info(f'{train}\'s path is {path_tracks}')
+                for path_track in path_tracks:
+                    path_track.lines.add(train)
+
         # set switch states
         junctions = self.graph.nodes
         for junction in junctions:
