@@ -91,6 +91,11 @@ class Simulation:
 
     def set_track_route_for_train(self, train: Train):
         log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
+        # Clear the tracks with this train
+        for edge_tup in self.graph.edges:
+            track: Track = self.graph.edges[edge_tup]['object']
+            if train in track.trains_routed_along_track:
+                track.trains_routed_along_track.clear()
 
         # Find the tracks that lie along the shortest path
         train_path: List[Junction] = nx.shortest_path(
@@ -149,6 +154,8 @@ class Simulation:
                 # Move the train
                 current_track: Track = self.graph.edges[current_edge]['object']
                 self.move_train(current_track, next_junct)
+        # Set the routes for the train
+        self.set_track_route_for_train(train)
 
     def move_train(self, old_track: Track, new_facing_junction: Junction):
         train = old_track.train
