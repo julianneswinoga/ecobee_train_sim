@@ -47,11 +47,13 @@ class Junction(SimObject):
         return self.switch_state
 
     def set_switch_state(self, junct1: 'Junction', junct2: 'Junction'):
+        new_switch_state = (junct1, junct2)
+        log.info(f'Switching {self} from {self.switch_state} to {new_switch_state}')
         if junct1 not in self.connected_junctions:
             raise IndexError(f'Can\'t set switch state: {junct1} not in {self.connected_junctions}')
         if junct2 not in self.connected_junctions:
             raise IndexError(f'Can\'t set switch state: {junct2} not in {self.connected_junctions}')
-        self.switch_state = (junct1, junct2)
+        self.switch_state = new_switch_state
 
 
 class Simulation:
@@ -87,40 +89,37 @@ class Simulation:
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
             if track.train:
-                train: Train = track.train
-                log.debug(f'Edge {edge_tup} has {train}')
-                next_junct1, next_junct2 = train.facing_junction.get_switch_state()
-                if next_junct1 == next_junct2:  # Terminator
-                    log.info(f'{train} at terminator')
-                else:
-                    # Figure out which junction we currently are at, and which one is the next
-                    if next_junct1 in edge_tup:
-                        next_junct = next_junct2
-                    elif next_junct2 in edge_tup:
-                        next_junct = next_junct1
-                    else:
-                        log.info(f'{train}\'s next junction not switched towards it')
-                        next_junct = None
-
-                        if edge_tup[0] in train.facing_junction.connected_junctions:
-                            prev_junction = edge_tup[0]
-                        elif edge_tup[1] in train.facing_junction.connected_junctions:
-                            prev_junction = edge_tup[1]
-                        else:
-                            raise IndexError(f'{train}\'s facing junction doesn\'t contain the edge {edge_tup}??')
-                        # Just pick the second one for now
-                        new_switch_state = (prev_junction, train.facing_junction.connected_junctions[1])
-                        log.info(
-                            f'Switching {train.facing_junction}'
-                            f'from {train.facing_junction.get_switch_state()}'
-                            f'to {new_switch_state}'
-                        )
-                        train.facing_junction.set_switch_state(*new_switch_state)
-                    if next_junct:
-                        # Move the train
-                        self.move_train(track, next_junct)
-
+                log.debug(f'Edge {edge_tup} has {track.train}')
+                self.update_train(edge_tup, track.train)
         self.step += 1
+
+    def update_train(self, current_edge: Tuple[Junction, Junction], train: Train):
+        next_junct1, next_junct2 = train.facing_junction.get_switch_state()
+        if next_junct1 == next_junct2:  # Terminator
+            log.info(f'{train} at terminator')
+        else:
+            # Figure out which junction we currently are at, and which one is the next
+            if next_junct1 in current_edge:
+                next_junct = next_junct2
+            elif next_junct2 in current_edge:
+                next_junct = next_junct1
+            else:
+                log.info(f'{train}\'s next junction not switched towards it')
+                next_junct = None
+
+                if current_edge[0] in train.facing_junction.connected_junctions:
+                    prev_junction = current_edge[0]
+                elif current_edge[1] in train.facing_junction.connected_junctions:
+                    prev_junction = current_edge[1]
+                else:
+                    raise IndexError(f'{train}\'s facing junction doesn\'t contain the edge {current_edge}??')
+                # Just pick the second one for now
+                new_switch_state = (prev_junction, train.facing_junction.connected_junctions[1])
+                train.facing_junction.set_switch_state(*new_switch_state)
+            if next_junct:
+                # Move the train
+                current_track: Track = self.graph.edges[current_edge]['object']
+                self.move_train(current_track, next_junct)
 
     def move_train(self, old_track: Track, new_facing_junction: Junction):
         train = old_track.train
