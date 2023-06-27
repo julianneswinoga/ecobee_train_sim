@@ -117,11 +117,21 @@ class Simulation:
                         )
                         train.facing_junction.set_switch_state(*new_switch_state)
                     if next_junct:
-                        next_track: Track = self.graph.edges[(train.facing_junction, next_junct)]['object']
                         # Move the train
-                        log.debug(f'{train} moving from {track} to {next_track}, facing {next_junct}')
-                        train.facing_junction = next_junct
-                        next_track.train = track.train
-                        track.train = None
+                        self.move_train(track, next_junct)
 
         self.step += 1
+
+    def move_train(self, old_track: Track, new_facing_junction: Junction):
+        train = old_track.train
+        if train is None:
+            raise TypeError(f'{old_track} does not have a train! Cannot move it facing {new_facing_junction}')
+        new_track: Track = self.graph.edges[(train.facing_junction, new_facing_junction)]['object']
+        log.debug(f'{train} moving from {old_track} to {new_track}, facing {new_facing_junction}')
+        if new_track.train is not None:
+            log.error(f'Tried to move {train} into already occupied {new_track}')
+            return
+        # Do the swap
+        train.facing_junction = new_facing_junction
+        new_track.train = train
+        old_track.train = None
