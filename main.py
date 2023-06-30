@@ -2,12 +2,15 @@
 
 import argparse
 import logging
+import colorama
 import sys
 
 import networkx as nx
 
 from graphics_visualization import MainApp
 from simulation_model import Train, Track, Junction, Simulation
+
+log = logging.getLogger('main')
 
 parser = argparse.ArgumentParser(
     # TODO: program description
@@ -22,6 +25,23 @@ parser.add_argument(
     default='WARNING',
     help='Set the logging level, one of %(choices)s (default %(default)s)',
 )
+
+
+class ColouredFormatter(logging.Formatter):
+    def format(self, record):
+        level_to_colour_code = {
+            logging.DEBUG: colorama.Style.DIM + colorama.Fore.BLUE,
+            logging.INFO: colorama.Style.DIM + colorama.Fore.GREEN,
+            logging.WARNING: colorama.Fore.YELLOW,
+            logging.ERROR: colorama.Fore.RED,
+            logging.CRITICAL: colorama.Style.BRIGHT + colorama.Fore.RED,
+        }
+        colour_code = level_to_colour_code.get(record.levelno)
+        if not colour_code:
+            raise IndexError(f'No colour defined for log level:{record.levelno}')
+        record_str = super().format(record)
+        coloured_record_str = colour_code + record_str + colorama.Style.RESET_ALL
+        return coloured_record_str
 
 
 def main():
@@ -52,10 +72,18 @@ def main():
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    logging.basicConfig(
-        format='[%(asctime)s][%(name)s][%(levelname)s] %(message)s',
-        datefmt='%m/%d/%Y %I:%M:%S%p',
-        level=args.log_level,
+
+    # Set up coloured console handler
+    ch = logging.StreamHandler()
+    ch.setFormatter(
+        ColouredFormatter(
+            fmt='[%(asctime)s][%(name)s][%(levelname)s] %(message)s',
+            datefmt='%m/%d/%Y %I:%M:%S%p',
+        )
     )
-    log = logging.getLogger('main')
+    # Configure log level and handler for all loggers
+    for logger in logging.root.manager.loggerDict.values():
+        logger.addHandler(ch)
+        logger.setLevel(args.log_level)
+
     main()
