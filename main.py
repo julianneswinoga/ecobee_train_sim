@@ -83,6 +83,9 @@ if __name__ == '__main__':
     )
     # Configure log level and handler for all loggers
     for logger in logging.root.manager.loggerDict.values():
+        if isinstance(logger, logging.PlaceHolder):
+            print(f'Not configuring {logger}')
+            continue  # Support debugging?
         logger.addHandler(ch)
         logger.setLevel(args.log_level)
 

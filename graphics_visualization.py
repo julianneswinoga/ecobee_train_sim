@@ -1,5 +1,8 @@
 import weakref
 import math
+import sys
+import signal
+import traceback
 import logging
 import random
 from typing import Dict, List, Optional, Tuple, Any
@@ -519,6 +522,21 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
 
 
+def exit_handler(*args):
+    QApplication.quit()
+
+
+def excepthook(exc_type, exc_value, exc_tb):
+    # Flush all logs
+    for logger in logging.root.manager.loggerDict.values():
+        for handler in logger.handlers:
+            handler.flush()
+    # Print the exception
+    log.critical('Exception caught')
+    log.critical(''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
+    exit_handler()
+
+
 class MainApp:
     def __init__(self, window_title: str, simulation: Simulation):
         log.debug('Creating QApplication')
@@ -527,5 +545,10 @@ class MainApp:
 
     def run(self) -> int:
         self.main_window.show()
+        # Register a custom exception handler (so that logs can be flushed)
+        sys.excepthook = excepthook
+        # Register exit handlers to catch ctrl+c
+        signal.signal(signal.SIGINT, exit_handler)
+        signal.signal(signal.SIGTERM, exit_handler)
         retcode = self.app.exec()
         return retcode
