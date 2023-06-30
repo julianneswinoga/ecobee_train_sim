@@ -48,13 +48,16 @@ def main():
     # Create the graph representation
     log.debug('Creating graph')
     graph = nx.Graph()
-    junctions = [Junction() for _ in range(7)]
+    junctions = [Junction() for _ in range(10)]
     graph.add_edge(
-        junctions[0], junctions[1], object=Track(Train(dest_junction=junctions[6], facing_junction=junctions[1]))
+        junctions[8], junctions[0], object=Track(Train(dest_junction=junctions[6], facing_junction=junctions[0]))
     )
-    graph.add_edge(junctions[1], junctions[2], object=Track())
+    graph.add_edge(junctions[0], junctions[1], object=Track())
+    graph.add_edge(junctions[1], junctions[9], object=Track())
+    graph.add_edge(junctions[9], junctions[2], object=Track())
     graph.add_edge(junctions[1], junctions[3], object=Track())
-    graph.add_edge(junctions[3], junctions[5], object=Track())
+    graph.add_edge(junctions[3], junctions[7], object=Track())
+    graph.add_edge(junctions[7], junctions[5], object=Track())
     graph.add_edge(junctions[3], junctions[4], object=Track())
     graph.add_edge(junctions[4], junctions[6], object=Track())
     graph.add_edge(
