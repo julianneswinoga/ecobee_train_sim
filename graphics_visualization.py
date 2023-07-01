@@ -101,22 +101,34 @@ class QtTrain(QGraphicsItem):
         return self.bounds
 
     def paint(self, painter, option, widget):
-        parent_item = self.parentItem()
+        parent_item: QtTrack = self.parentItem()
         parent_center = parent_item.connecting_line.center()
-        r = QRectF(parent_center.x(), parent_center.y(), 30, 10)
-        r.moveCenter(r.topLeft())  # Center the rectangle on the line
+        body_rect = QRectF(parent_center.x(), parent_center.y(), 30, 10)
+        body_rect.moveCenter(body_rect.topLeft())  # Center the rectangle on the line
+        front_rect = QRectF(body_rect.x(), body_rect.y(), 5, 10)
+
+        facing_sim_junction = parent_item.track.train.facing_junction
+        if parent_item.source_node().junction == facing_sim_junction:
+            facing_qt_junction = parent_item.source_node()
+        elif parent_item.dest_node().junction == facing_sim_junction:
+            facing_qt_junction = parent_item.dest_node()
+        else:
+            raise IndexError(f'No facing junction for {parent_item.track.train}')
 
         # Rotate ourself about the center
         # (can't just rotate the painting because the bounds will get screwed up)
         self.resetTransform()
         t = self.transform()
-        t.translate(r.center().x(), r.center().y())
-        t.rotate(-parent_item.connecting_line.angle())
-        t.translate(-r.center().x(), -r.center().y())
+        t.translate(body_rect.center().x(), body_rect.center().y())
+        # I hate rotation matrices, this took a lot of trial and error
+        line_to_facing_junction = QLineF(body_rect.center(), self.mapFromItem(facing_qt_junction, 0, 0))
+        t.rotate(-line_to_facing_junction.angle() + 180)
+        t.translate(-body_rect.center().x(), -body_rect.center().y())
         self.setTransform(t)
 
         painter.setPen(self.train_colour)
-        painter.drawRect(r)
+        painter.drawRect(body_rect)
+        painter.drawRect(front_rect)
 
         text = f'Train{parent_item.track.train.ident}'
         text_bounds = painter.fontMetrics().boundingRect(text)
@@ -124,10 +136,10 @@ class QtTrain(QGraphicsItem):
         painter.drawText(text_bounds, 0, text)
 
         # Increase bounds a bit, else some minor artefact show
-        siz = r.size()
+        siz = body_rect.size()
         siz *= 1.5
-        r.setSize(siz)
-        self.bounds = r.united(text_bounds)
+        body_rect.setSize(siz)
+        self.bounds = body_rect.united(text_bounds).united(front_rect)
 
 
 track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
