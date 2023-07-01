@@ -1,4 +1,5 @@
 import logging
+import copy
 import itertools
 from typing import Optional, Tuple, List, Dict, Set
 
@@ -113,7 +114,7 @@ class Simulation:
         log.debug(f'Junction behind {train} is {rear_junction}')
         return rear_junction
 
-    def get_sorted_junctions_for_route(self, train: Train):
+    def get_sorted_junctions_for_route(self, train: Train) -> List[Junction]:
         junctions_on_route: Set[Junction] = set()
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -139,7 +140,22 @@ class Simulation:
                     break
         return sorted_junctions_on_route
 
+    def get_tracks_for_junction_path(self, junction_path: List[Junction]) -> List[Track]:
+        # Create a copy so we don't modify the callers list
+        junction_path_copy = copy.copy(junction_path)
+        path_edge_tuples: List[Tuple[Junction, Junction]] = [(junction_path_copy.pop(0), junction_path_copy.pop(0))]
+        while True:
+            try:
+                next_junction = junction_path_copy.pop(0)
+            except IndexError:
+                break  # No more junctions in the path
+            next_edge = (path_edge_tuples[-1][1], next_junction)
+            path_edge_tuples.append(next_edge)
+        path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
+        return path_tracks
+
     def set_switches_for_train_route(self, train: Train, exclude_junctions: List[Junction]) -> List[Junction]:
+        log.info(f'Setting switches for {train}, exclude={exclude_junctions}')
         junctions_on_route = self.get_sorted_junctions_for_route(train)
         log.debug(f'{train} route has sorted junctions {junctions_on_route}')
 
@@ -159,6 +175,36 @@ class Simulation:
             junction_switches_set.append(cur_junction)
         log.info(f'{train} set switches on: {junction_switches_set}')
         return junction_switches_set
+
+    def set_signals_for_train_route(self, train: Train, exclude_signals: List[TrainSignal]) -> List[TrainSignal]:
+        log.info(f'Setting signals for {train}, exclude={exclude_signals}')
+        junctions_on_route = self.get_sorted_junctions_for_route(train)
+        tracks_on_route = self.get_tracks_for_junction_path(junctions_on_route)
+        log.debug(f'{train} route has sorted tracks {tracks_on_route}')
+
+        train_signals_set: Set[TrainSignal] = set()
+        # Flip all signals attached to junctions on the route to red to begin with
+        # Exclude the junction that is behind the train
+        junction_behind_train = self.get_junction_behind_train(train)
+        for track in self.get_all_tracks():
+            for train_signal in track.train_signals:
+                signal_on_route = train_signal.attached_junction in junctions_on_route
+                signal_not_excluded = train_signal not in exclude_signals
+                signal_not_behind_train = train_signal.attached_junction != junction_behind_train
+                if signal_on_route and signal_not_excluded and signal_not_behind_train:
+                    train_signal.signal_state = False
+                    train_signals_set.add(train_signal)
+        # Now go through all the tracks and set their signals to green
+        for track_on_route in tracks_on_route:
+            for train_signal in track_on_route.train_signals:
+                signal_on_route = train_signal.attached_junction in junctions_on_route
+                signal_not_excluded = train_signal not in exclude_signals
+                signal_not_behind_train = train_signal.attached_junction != junction_behind_train
+                if signal_on_route and signal_not_excluded and signal_not_behind_train:
+                    train_signal.signal_state = True
+                    train_signals_set.add(train_signal)
+        log.info(f'{train} set signals: {train_signals_set}')
+        return list(train_signals_set)
 
     def set_track_route_for_train(self, train: Train):
         log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
@@ -189,15 +235,7 @@ class Simulation:
         log.info(f'{train}\'s junction path is {train_path}')
 
         # Find the tracks that lie along the shortest path
-        path_edge_tuples: List[Tuple[Junction, Junction]] = [(train_path.pop(0), train_path.pop(0))]
-        while True:
-            try:
-                next_junction = train_path.pop(0)
-            except IndexError:
-                break  # No more junctions in the path
-            next_edge = (path_edge_tuples[-1][1], next_junction)
-            path_edge_tuples.append(next_edge)
-        path_tracks: List[Track] = [self.graph.edges[path_edge]['object'] for path_edge in path_edge_tuples]
+        path_tracks = self.get_tracks_for_junction_path(train_path)
         log.info(f'{train}\'s track path is {path_tracks}')
 
         # Tell the tracks about the route
@@ -222,11 +260,6 @@ class Simulation:
     def advance(self) -> bool:
         log.debug(f'Advancing simulation. step={self.step}')
 
-        # Flip all signals just for testing
-        for track in self.get_all_tracks():
-            for train_signal in track.train_signals:
-                train_signal.signal_state = not train_signal.signal_state
-
         # Simple routing strategy:
         # - Deterministically sort all the trains that aren't at their destination
         # - Route the first non-terminated train, and keep track of the switches it set
@@ -241,10 +274,13 @@ class Simulation:
             for train in self.get_all_trains():
                 self.update_train(train)
             switches_already_set: List[Junction] = []
+            signals_already_set: List[TrainSignal] = []
             for unfinished_train_sorted in unfinished_trains_sorted:
-                log.info(f'Setting switches for {unfinished_train_sorted}')
                 switches_already_set += self.set_switches_for_train_route(
                     unfinished_train_sorted, exclude_junctions=switches_already_set
+                )
+                signals_already_set += self.set_signals_for_train_route(
+                    unfinished_train_sorted, exclude_signals=signals_already_set
                 )
         else:
             log.info('All trains at destination!')
