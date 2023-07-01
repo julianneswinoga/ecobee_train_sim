@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
-from PySide6.QtGui import QPainter, QPainterPath, QPen
+from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -35,6 +35,7 @@ class QtEdge(QGraphicsItem):
 
         self._source_point = QPointF()
         self._dest_point = QPointF()
+        self.connecting_line = QLineF()
         self.bounds = QRectF()
         self.setAcceptedMouseButtons(Qt.NoButton)
         self.source: weakref.ReferenceType[QtNode] = weakref.ref(source_node)
@@ -73,6 +74,7 @@ class QtEdge(QGraphicsItem):
         self.prepareGeometryChange()
         self._source_point = line.p1() + edge_offset
         self._dest_point = line.p2() - edge_offset
+        self.connecting_line = QLineF(self._source_point, self._dest_point)
 
     def boundingRect(self):
         return self.bounds
@@ -83,11 +85,44 @@ class QtEdge(QGraphicsItem):
             return
 
         painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        line = QLineF(self._source_point, self._dest_point)
-        painter.drawLine(line)
-        line_bounds = QRectF(line.p1(), line.p2()).normalized()
+        painter.drawLine(self.connecting_line)
+        line_bounds = QRectF(self.connecting_line.p1(), self.connecting_line.p2()).normalized()
 
         self.bounds = line_bounds
+
+
+class QtTrain(QGraphicsItem):
+    def __init__(self, train_colour: Qt.GlobalColor, parent: QtEdge):
+        super().__init__(parent)
+        self.train_colour: Qt.GlobalColor = train_colour
+        self.bounds = QRectF()
+
+    def boundingRect(self):
+        return self.bounds
+
+    def paint(self, painter, option, widget):
+        parent_item = self.parentItem()
+        parent_center = parent_item.connecting_line.center()
+        r = QRectF(parent_center.x(), parent_center.y(), 30, 10)
+        r.moveCenter(r.topLeft())  # Center the rectangle on the line
+
+        # Rotate ourself about the center
+        # (can't just rotate the painting because the bounds will get screwed up)
+        self.resetTransform()
+        t = self.transform()
+        t.translate(r.center().x(), r.center().y())
+        t.rotate(-parent_item.connecting_line.angle())
+        t.translate(-r.center().x(), -r.center().y())
+        self.setTransform(t)
+
+        painter.setPen(self.train_colour)
+        painter.drawRect(r)
+
+        # Increase bounds a bit, else some minor artefact show
+        siz = r.size()
+        siz *= 1.5
+        r.setSize(siz)
+        self.bounds = r
 
 
 track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
@@ -112,6 +147,7 @@ class QtTrack(QtEdge):
         super().__init__(source_junction, dest_junction)
 
         self.track = track
+        self.qt_train: Optional[QtTrain] = None
 
     def paint(self, painter, option, widget):
         if not self.source() or not self.dest():
@@ -120,13 +156,12 @@ class QtTrack(QtEdge):
 
         # Draw the main connecting line (black line between nodes)
         painter.setPen(QPen(Qt.black, 1, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
-        connecting_line = QLineF(self._source_point, self._dest_point)
-        painter.drawLine(connecting_line)
-        line_bounds = QRectF(connecting_line.p1(), connecting_line.p2()).normalized()
+        painter.drawLine(self.connecting_line)
+        line_bounds = QRectF(self.connecting_line.p1(), self.connecting_line.p2()).normalized()
 
         # Draw the train routes
         track_line_bounds = []
-        connecting_line_unit_normal = connecting_line.unitVector().normalVector()
+        connecting_line_unit_normal = self.connecting_line.unitVector().normalVector()
         for i, train_line in enumerate(self.track.trains_routed_along_track, start=1):
             # Create copy of normal line
             offset_line = QLineF(connecting_line_unit_normal.p1(), connecting_line_unit_normal.p2())
@@ -135,7 +170,7 @@ class QtTrack(QtEdge):
             offset_line_delta_point = QPointF(offset_line.dx(), offset_line.dy())
 
             # Create copy of connecting line
-            track_line = QLineF(connecting_line.p1(), connecting_line.p2())
+            track_line = QLineF(self.connecting_line.p1(), self.connecting_line.p2())
             # Translate it by the offset line delta
             track_line.translate(offset_line_delta_point)
             track_colour = get_track_line_colour(train_line)
@@ -143,13 +178,19 @@ class QtTrack(QtEdge):
             painter.drawLine(track_line)
             track_line_bounds.append(QRectF(track_line.p1(), track_line.p2()).normalized())
 
+        # Create/delete a child train item if needed
+        if self.track.train and not self.qt_train:
+            self.qt_train = QtTrain(get_track_line_colour(self.track.train), parent=self)
+            log.debug(f'Created QtTrain {self.qt_train} at {self.track}')
+        elif not self.track.train and self.qt_train:
+            log.debug(f'Deleting QtTrain {self.qt_train} from {self.track}')
+            self.qt_train.setParentItem(None)
+            del self.qt_train
+            self.qt_train = None
+
         # Draw text
-        if self.track.train:
-            text = f'Track({self.track.ident}) {self.track.train}'
-            painter.setPen(get_track_line_colour(self.track.train))
-        else:
-            text = f'Track({self.track.ident})'
-            painter.setPen(Qt.black)
+        text = f'Track({self.track.ident})'
+        painter.setPen(Qt.black)
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(line_bounds.center().toPoint())
         painter.drawText(text_bounds, 0, text)
