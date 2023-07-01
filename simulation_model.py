@@ -29,10 +29,18 @@ class Train(SimObject):
         self.facing_junction = facing_junction
 
 
+class TrainSignal(SimObject):
+    def __init__(self, attached_junction: 'Junction'):
+        super().__init__()
+        self.attached_junction: Junction = attached_junction
+        self.signal_state: bool = True
+
+
 class Track(SimObject):
-    def __init__(self, train: Optional[Train] = None):
+    def __init__(self, train: Optional[Train] = None, signals: Optional[List[TrainSignal]] = None):
         super().__init__()
         self.train: Optional[Train] = train
+        self.train_signals: List[TrainSignal] = signals if signals else []
         self.trains_routed_along_track: Set[Train] = set()
 
 
@@ -192,6 +200,11 @@ class Simulation:
 
     def advance(self) -> bool:
         log.debug(f'Advancing simulation. step={self.step}')
+
+        # Flip all signals just for testing
+        for track in self.get_all_tracks():
+            for train_signal in track.train_signals:
+                train_signal.signal_state = not train_signal.signal_state
 
         # Simple routing strategy:
         # Sort all the trains that aren't at their destination

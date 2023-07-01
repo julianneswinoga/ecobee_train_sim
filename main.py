@@ -8,7 +8,7 @@ import sys
 import networkx as nx
 
 from graphics_visualization import MainApp
-from simulation_model import Train, Track, Junction, Simulation
+from simulation_model import Train, TrainSignal, Track, Junction, Simulation
 
 log = logging.getLogger('main')
 
@@ -50,9 +50,9 @@ def main():
     graph = nx.Graph()
     junctions = [Junction() for _ in range(10)]
     graph.add_edge(
-        junctions[8], junctions[0], object=Track(Train(dest_junction=junctions[6], facing_junction=junctions[0]))
+        junctions[8], junctions[0], object=Track(train=Train(dest_junction=junctions[6], facing_junction=junctions[0]))
     )
-    graph.add_edge(junctions[0], junctions[1], object=Track())
+    graph.add_edge(junctions[0], junctions[1], object=Track(signals=[TrainSignal(junctions[1])]))
     graph.add_edge(junctions[1], junctions[9], object=Track())
     graph.add_edge(junctions[9], junctions[2], object=Track())
     graph.add_edge(junctions[1], junctions[3], object=Track())
@@ -61,7 +61,7 @@ def main():
     graph.add_edge(junctions[3], junctions[4], object=Track())
     graph.add_edge(junctions[4], junctions[6], object=Track())
     graph.add_edge(
-        junctions[2], junctions[4], object=Track(Train(dest_junction=junctions[5], facing_junction=junctions[2]))
+        junctions[2], junctions[4], object=Track(train=Train(dest_junction=junctions[5], facing_junction=junctions[2]))
     )
 
     log.debug('Creating simulation')

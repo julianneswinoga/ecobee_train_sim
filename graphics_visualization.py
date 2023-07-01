@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
-from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform
+from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform, QColor
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes, interact
 
-from simulation_model import SimObject, Train, Track, Junction, Simulation
+from simulation_model import SimObject, Train, TrainSignal, Track, Junction, Simulation
 
 log = logging.getLogger('graphics_visualization')
 
@@ -128,6 +128,7 @@ class QtTrain(QGraphicsItem):
 
         painter.setPen(self.train_colour)
         painter.drawRect(body_rect)
+        painter.setBrush(self.train_colour)
         painter.drawRect(front_rect)
 
         text = f'Train{parent_item.track.train.ident}'
@@ -144,7 +145,12 @@ class QtTrain(QGraphicsItem):
 
 track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
 next_colour_idx: int = 0
-all_track_line_colours = [Qt.green, Qt.blue, Qt.darkYellow]
+all_track_line_colours = [
+    QColor.fromString('#FF7F11'),
+    QColor.fromString('#2F97C1'),
+    QColor.fromString('#587291'),
+    QColor.fromString('#15E6CD'),
+]
 
 
 def get_track_line_colour(track_line: Train) -> Qt.GlobalColor:
@@ -205,6 +211,26 @@ class QtTrack(QtEdge):
             del self.qt_train
             self.qt_train = None
 
+        # Draw any signals
+        signal_ellipse_bounds = []
+        for train_signal in self.track.train_signals:
+            signal_sim_junction = train_signal.attached_junction
+            # connecting_line is always from source to dest, so we cheat a bit to not
+            # have to figure out the geomerty from scratch again
+            if self.source_node().junction == signal_sim_junction:
+                signal_point = self.connecting_line.p1()
+            elif self.dest_node().junction == signal_sim_junction:
+                signal_point = self.connecting_line.p2()
+            else:
+                raise IndexError(f'No attached junction for {train_signal}')
+            signal_ellipse_bound = QRectF(-4, -4, 4, 4)
+            signal_ellipse_bound.moveCenter(signal_point)
+            signal_colour = Qt.green if train_signal.signal_state else Qt.red
+            painter.setPen(signal_colour)
+            painter.setBrush(signal_colour)
+            painter.drawEllipse(signal_ellipse_bound)
+            signal_ellipse_bounds.append(signal_ellipse_bound)
+
         # Draw text
         text = f'Track({self.track.ident})'
         painter.setPen(Qt.black)
@@ -215,6 +241,8 @@ class QtTrack(QtEdge):
         total_bounds = line_bounds.united(text_bounds)
         for track_line_bound in track_line_bounds:
             total_bounds = total_bounds.united(track_line_bound)
+        for signal_ellipse_bound in signal_ellipse_bounds:
+            total_bounds = total_bounds.united(signal_ellipse_bound)
         self.bounds = total_bounds
 
 
