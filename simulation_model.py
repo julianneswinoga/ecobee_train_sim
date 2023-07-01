@@ -1,5 +1,6 @@
 import logging
-from typing import Optional, Tuple, List, Dict, Set, Generator
+import itertools
+from typing import Optional, Tuple, List, Dict, Set
 
 import networkx as nx
 
@@ -163,11 +164,25 @@ class Simulation:
             if train in track.trains_routed_along_track:
                 track.trains_routed_along_track.clear()
 
-        # Find the tracks that lie along the shortest path
-        train_path: List[Junction] = nx.shortest_path(
-            self.graph, source=train.facing_junction, target=train.dest_junction
+        # List of all paths. Prioritize the shortest paths, then just use all simple paths
+        train_paths: itertools.chain[List[Junction]] = itertools.chain(
+            nx.all_shortest_paths(self.graph, source=train.facing_junction, target=train.dest_junction),
+            nx.all_simple_paths(self.graph, source=train.facing_junction, target=train.dest_junction),
         )
+        train_path: Optional[List[Junction]] = None
+        junction_behind_train = self.get_junction_behind_train(train)
+        for potential_train_path in train_paths:
+            # Select the first path where the second Junction isn't the Junction behind the trains position
+            # else we would need the train to flip around!
+            if potential_train_path[1] != junction_behind_train:
+                train_path = potential_train_path
+                break
+        if not train_path:
+            log.error(f'Could not find path for {train}!')
+            return
         log.info(f'{train}\'s junction path is {train_path}')
+
+        # Find the tracks that lie along the shortest path
         path_edge_tuples: List[Tuple[Junction, Junction]] = [(train_path.pop(0), train_path.pop(0))]
         while True:
             try:
