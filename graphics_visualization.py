@@ -118,11 +118,16 @@ class QtTrain(QGraphicsItem):
         painter.setPen(self.train_colour)
         painter.drawRect(r)
 
+        text = f'Train{parent_item.track.train.ident}'
+        text_bounds = painter.fontMetrics().boundingRect(text)
+        text_bounds.moveTo(parent_center.toPoint())
+        painter.drawText(text_bounds, 0, text)
+
         # Increase bounds a bit, else some minor artefact show
         siz = r.size()
         siz *= 1.5
         r.setSize(siz)
-        self.bounds = r
+        self.bounds = r.united(text_bounds)
 
 
 track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
@@ -181,9 +186,9 @@ class QtTrack(QtEdge):
         # Create/delete a child train item if needed
         if self.track.train and not self.qt_train:
             self.qt_train = QtTrain(get_track_line_colour(self.track.train), parent=self)
-            log.debug(f'Created QtTrain {self.qt_train} at {self.track}')
+            log.debug(f'Created QtTrain at {self.track}')
         elif not self.track.train and self.qt_train:
-            log.debug(f'Deleting QtTrain {self.qt_train} from {self.track}')
+            log.debug(f'Deleting QtTrain from {self.track}')
             self.qt_train.setParentItem(None)
             del self.qt_train
             self.qt_train = None
@@ -313,21 +318,28 @@ class QtJunction(QtNode):
 
     def update_fork_nodes(self):
         # Find the two edges from the fork identifiers
-        qt_node_fork1, qt_node_fork2 = None, None
+        qt_node_forks = []
         for qt_edge in self._edge_list:
             edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
             edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
             switch_junct1, switch_junct2 = self.junction.get_switch_state()
+            # forks could be the same, can't use elif or compact into a single if
             if edge_node1.junction == switch_junct1:
-                qt_node_fork1 = edge_node1
+                qt_node_forks.append(edge_node1)
+            if edge_node1.junction == switch_junct2:
+                qt_node_forks.append(edge_node1)
+            if edge_node2.junction == switch_junct1:
+                qt_node_forks.append(edge_node2)
             if edge_node2.junction == switch_junct2:
-                qt_node_fork2 = edge_node2
-            if qt_node_fork1 is not None and qt_node_fork2 is not None:
-                break
-        if qt_node_fork1 is None or qt_node_fork2 is None:
+                qt_node_forks.append(edge_node2)
+            if len(qt_node_forks) == 2:
+                break  # Found both forks
+        if len(qt_node_forks) < 2:
             # Forks not found, no update
             return
-        self.fork_qt_notes = (qt_node_fork1, qt_node_fork2)
+        if len(qt_node_forks) > 2:
+            raise IndexError(f'Found more than 2 fork nodes? {qt_node_forks}')
+        self.fork_qt_notes = (qt_node_forks[0], qt_node_forks[1])
 
     def add_edge(self, edge):
         super().add_edge(edge)
@@ -363,6 +375,8 @@ class QtJunction(QtNode):
             painter.setPen(QPen(Qt.red))
             painter.drawLine(line1)
             painter.drawLine(line2)
+        else:
+            log.error(f'No fork nodes for {self.junction.ident}')
 
         # calculate item bounds
         self.bounds = ellipse_bounds.united(text_bounds)
@@ -404,6 +418,17 @@ class GraphWidget(QGraphicsView):
         edges: List[QtEdge] = []
         for node_start_obj, edge_connection_dict in graph_data.items():
             for node_end_obj, edge_data in edge_connection_dict.items():
+                # Skip any edges that already connect the two nodes
+                edge_already_connected = False
+                for edge in edges:
+                    edge_node_tup = (edge.source_node().junction, edge.dest_node().junction)
+                    source_already_connected = node_start_obj in edge_node_tup
+                    dest_already_connected = node_end_obj in edge_node_tup
+                    if source_already_connected and dest_already_connected:
+                        edge_already_connected = True
+                if edge_already_connected:
+                    continue
+
                 # Convert simulation types into graphics types
                 edge_obj = edge_data['object']
                 if isinstance(edge_obj, Track):
