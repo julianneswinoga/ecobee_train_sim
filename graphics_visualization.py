@@ -131,7 +131,10 @@ class QtTrain(QGraphicsItem):
         painter.setBrush(self.train_colour)
         painter.drawRect(front_rect)
 
+        font = painter.font()
         text = f'Train{parent_item.track.train.ident}'
+        font.setPointSize(6)
+        painter.setFont(font)
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(parent_center.toPoint())
         painter.drawText(text_bounds, 0, text)
@@ -211,6 +214,8 @@ class QtTrack(QtEdge):
             del self.qt_train
             self.qt_train = None
 
+        font = painter.font()
+
         # Draw any signals
         signal_ellipse_bounds = []
         for train_signal in self.track.train_signals:
@@ -231,8 +236,20 @@ class QtTrack(QtEdge):
             painter.drawEllipse(signal_ellipse_bound)
             signal_ellipse_bounds.append(signal_ellipse_bound)
 
+            # Signal text
+            text = f'Sig{train_signal.ident}'
+            font.setPointSize(5)
+            painter.setFont(font)
+            painter.setPen(Qt.black)
+            text_bounds = painter.fontMetrics().boundingRect(text)
+            text_bounds.moveTo(signal_ellipse_bound.center().toPoint())
+            painter.drawText(text_bounds, 0, text)
+            signal_ellipse_bounds.append(text_bounds)
+
         # Draw text
         text = f'Track({self.track.ident})'
+        font.setPointSize(8)
+        painter.setFont(font)
         painter.setPen(Qt.black)
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(line_bounds.center().toPoint())
@@ -398,7 +415,10 @@ class QtJunction(QtNode):
         painter.drawEllipse(ellipse_bounds)
 
         # Draw text
+        font = painter.font()
         text = f'Junction({self.junction.ident})'
+        font.setPointSize(8)
+        painter.setFont(font)
         painter.setPen(QPen(Qt.black))
         text_bounds = painter.fontMetrics().boundingRect(text)
         text_bounds.moveTo(ellipse_bounds.center().toPoint())
