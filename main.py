@@ -53,7 +53,7 @@ def main():
         junctions[8], junctions[0], object=Track(train=Train(dest_junction=junctions[6], facing_junction=junctions[0]))
     )
     graph.add_edge(junctions[0], junctions[1], object=Track(signals=[TrainSignal(junctions[1])]))
-    graph.add_edge(junctions[1], junctions[9], object=Track())
+    graph.add_edge(junctions[1], junctions[9], object=Track(signals=[TrainSignal(junctions[1])]))
     graph.add_edge(junctions[9], junctions[2], object=Track())
     graph.add_edge(junctions[1], junctions[3], object=Track())
     graph.add_edge(junctions[3], junctions[7], object=Track())

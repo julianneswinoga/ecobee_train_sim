@@ -34,7 +34,7 @@ class TrainSignal(SimObject):
     def __init__(self, attached_junction: 'Junction'):
         super().__init__()
         self.attached_junction: Junction = attached_junction
-        self.signal_state: bool = True
+        self.signal_state: bool = False
 
 
 class Track(SimObject):
@@ -251,6 +251,13 @@ class Simulation:
             raise IndexError(f'Couldn\'t find edge for {train}!')
         return train_edge
 
+    @staticmethod
+    def get_signal(track: Track, junction: Junction) -> Optional[TrainSignal]:
+        for train_signal in track.train_signals:
+            if train_signal.attached_junction == junction:
+                return train_signal
+        return None
+
     def update_train(self, train: Train):
         current_edge = self.get_edge_tup_for_train(train)
         next_junct1, next_junct2 = train.facing_junction.get_switch_state()
@@ -266,9 +273,18 @@ class Simulation:
                 log.info(f'{train}\'s next junction not switched towards it')
                 log.debug(f'({current_edge}, {next_junct1}, {next_junct2})')
                 next_junct = None
-            if next_junct:
+
+            # Check if the current facing junction's signal is switched green
+            current_track: Track = self.graph.edges[current_edge]['object']
+            train_signal = self.get_signal(current_track, train.facing_junction)
+            if train_signal and not train_signal.signal_state:
+                log.info(f'{train}\'s facing signal not switched green')
+                signal_ok = False
+            else:
+                signal_ok = True
+
+            if next_junct and signal_ok:
                 # Move the train
-                current_track: Track = self.graph.edges[current_edge]['object']
                 self.move_train(current_track, next_junct)
         # Set the routes for the train
         self.set_track_route_for_train(train)
