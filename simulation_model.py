@@ -139,20 +139,26 @@ class Simulation:
                     break
         return sorted_junctions_on_route
 
-    def set_switches_for_train_route(self, train: Train):
+    def set_switches_for_train_route(self, train: Train, exclude_junctions: List[Junction]) -> List[Junction]:
         junctions_on_route = self.get_sorted_junctions_for_route(train)
         log.debug(f'{train} route has sorted junctions {junctions_on_route}')
 
         # Go through the Junctions on the trains route,
         # if that junction's switch can be changed (more than 2 adjacent junctions)
         # set that junction's switch to the previous and next junction in the route
+        junction_switches_set: List[Junction] = []
         for junction_idx in range(1, len(junctions_on_route) - 1):
             prev_junction = junctions_on_route[junction_idx - 1]
             cur_junction = junctions_on_route[junction_idx]
             next_junction = junctions_on_route[junction_idx + 1]
             if len(cur_junction.connected_junctions) < 3:
                 continue  # Junction can't be switched
+            if cur_junction in exclude_junctions:
+                continue  # Junction is excluded
             cur_junction.set_switch_state(prev_junction, next_junction)
+            junction_switches_set.append(cur_junction)
+        log.info(f'{train} set switches on: {junction_switches_set}')
+        return junction_switches_set
 
     def set_track_route_for_train(self, train: Train):
         log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
@@ -222,8 +228,9 @@ class Simulation:
                 train_signal.signal_state = not train_signal.signal_state
 
         # Simple routing strategy:
-        # Sort all the trains that aren't at their destination
-        # Only route the first non-terminated train
+        # - Deterministically sort all the trains that aren't at their destination
+        # - Route the first non-terminated train, and keep track of the switches it set
+        # - Route the next train, but don't allow it to flip the switches that have already been set
         unfinished_trains_sorted = sorted(
             (t for t in self.get_all_trains() if t.facing_junction != t.dest_junction),
             key=lambda t: t.ident,
@@ -233,8 +240,12 @@ class Simulation:
             # Update trains
             for train in self.get_all_trains():
                 self.update_train(train)
-            log.info(f'Setting switches for {unfinished_trains_sorted[0]}')
-            self.set_switches_for_train_route(unfinished_trains_sorted[0])
+            switches_already_set: List[Junction] = []
+            for unfinished_train_sorted in unfinished_trains_sorted:
+                log.info(f'Setting switches for {unfinished_train_sorted}')
+                switches_already_set += self.set_switches_for_train_route(
+                    unfinished_train_sorted, exclude_junctions=switches_already_set
+                )
         else:
             log.info('All trains at destination!')
         self.step += 1
