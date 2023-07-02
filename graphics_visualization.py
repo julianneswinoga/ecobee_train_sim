@@ -508,15 +508,15 @@ class GraphWidget(QGraphicsView):
 
         self.scale(0.8, 0.8)
 
-    def advance_simulation(self) -> int:
-        self.simulation.advance()
+    def advance_simulation(self) -> Tuple[bool, int]:
+        sim_finished = not self.simulation.advance()
         # Update all the fork nodes in case any junctions switched
         for item in self.scene().items():
             if isinstance(item, QtJunction):
                 item.update_fork_nodes()
         # Force repaint
         self.repaint_all(force_paint=True)
-        return self.simulation.step
+        return sim_finished, self.simulation.step
 
     def repaint_all(self, force_paint=False):
         if force_paint:
@@ -616,8 +616,10 @@ class MainWidget(QWidget):
     def param_change(self, param_root: Parameter, changes: List[Tuple[Parameter, str, Any]]):
         log.debug(f'Parameter changes:{changes}')
         for param, change, data in changes:
-            if param == self.param_one_step:
+            if param == self.param_one_step and change == 'activated':
                 self.step_simulation()
+            elif param == self.param_one_step and change == 'options':
+                self.param_one_step.setOpts(**data)
             elif param == self.param_run_cont:
                 if data is True:
                     self.simulation_timer.setInterval(self.param_update_delay.value())
@@ -632,8 +634,12 @@ class MainWidget(QWidget):
                 log.error(f'Unknown parameter change:{param}')
 
     def step_simulation(self):
-        sim_step_idx = self.graph_widget.advance_simulation()
+        sim_finished, sim_step_idx = self.graph_widget.advance_simulation()
         self.param_sim_step_idx.setValue(sim_step_idx)
+        if sim_finished:
+            self.param_one_step.setOpts(enabled=False)
+            self.param_run_cont.setValue(False)
+            self.param_run_cont.setOpts(enabled=False)
 
 
 class MainWindow(QMainWindow):
