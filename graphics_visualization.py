@@ -672,6 +672,10 @@ class MainWindow(QMainWindow):
         self.load_file_action.triggered.connect(self.load_file)
         self.file_menu.addAction(self.load_file_action)
 
+        self.save_file_as_action = QAction('Save as')
+        self.save_file_as_action.triggered.connect(self.save_file_as)
+        self.file_menu.addAction(self.save_file_as_action)
+
         self.exit_action = QAction('Exit')
         self.exit_action.triggered.connect(exit_handler)
         self.file_menu.addAction(self.exit_action)
@@ -688,6 +692,13 @@ class MainWindow(QMainWindow):
         log.debug(f'User picked path {file_path}')
         new_sim = Simulation.load_from_file(file_path)
         self.main_widget.set_simulation(new_sim)
+
+    def save_file_as(self):
+        file_name = QFileDialog.getSaveFileName(self, 'Save Simulation File', '', 'Simulation Files (*.json)')
+        if not file_name[0]:
+            return  # User canceled
+        file_path = Path(file_name[0])
+        self.main_widget.graph_widget.simulation.save_to_file(file_path)
 
 
 def exit_handler(*args):
