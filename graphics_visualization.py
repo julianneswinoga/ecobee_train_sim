@@ -724,12 +724,17 @@ class MainWindow(QMainWindow):
         if file_path:
             log.debug(f'Saving provided path {file_path}')
         else:
-            file_name = QFileDialog.getSaveFileName(self, 'Save Simulation File', '', 'Simulation Files (*.json)')
+            currently_loaded_name = self.loaded_file_path.name
+            file_name = QFileDialog.getSaveFileName(
+                self, 'Save Simulation File', currently_loaded_name, 'Simulation Files (*.json)'
+            )
             if not file_name[0]:
                 return  # User canceled
             file_path = Path(file_name[0])
-
         self.main_widget.graph_widget.simulation.save_to_file(file_path)
+
+        self.loaded_file_path = file_path.resolve()  # Update the loaded path, incase name changed
+        self.set_window_title()
 
 
 def exit_handler(*args):
