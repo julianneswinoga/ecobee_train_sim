@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
-from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform, QColor
+from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform, QColor, QAction
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -648,6 +648,13 @@ class MainWindow(QMainWindow):
 
         self.setMinimumSize(400, 400)
         self.setWindowTitle(window_title)
+
+        self.menu_bar = self.menuBar()
+        self.file_menu = self.menu_bar.addMenu('&File')
+
+        self.exit_action = QAction('Exit')
+        self.exit_action.triggered.connect(exit_handler)
+        self.file_menu.addAction(self.exit_action)
 
         log.debug('Creating MainWidget')
         self.main_widget = MainWidget(simulation)
