@@ -668,7 +668,9 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setMinimumSize(400, 400)
-        self.setWindowTitle(window_title)
+        self.bare_window_title = window_title
+        self.loaded_file_path: Optional[Path] = None
+        self.set_window_title()
 
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu('&File')
@@ -676,6 +678,10 @@ class MainWindow(QMainWindow):
         self.load_file_action = QAction('Load')
         self.load_file_action.triggered.connect(self.load_file)
         self.file_menu.addAction(self.load_file_action)
+
+        self.save_file_action = QAction('Save')
+        self.save_file_action.triggered.connect(self.save_file)
+        self.file_menu.addAction(self.save_file_action)
 
         self.save_file_as_action = QAction('Save as')
         self.save_file_as_action.triggered.connect(self.save_file_as)
@@ -689,6 +695,10 @@ class MainWindow(QMainWindow):
         self.main_widget = MainWidget()
         self.setCentralWidget(self.main_widget)
 
+    def set_window_title(self):
+        file_path_str = str(self.loaded_file_path) if self.loaded_file_path else 'No file loaded'
+        self.setWindowTitle(f'{self.bare_window_title} - {file_path_str}')
+
     def load_file(self, file_path: Optional[Path] = None):
         if file_path:
             log.debug(f'Loading provided path {file_path}')
@@ -701,13 +711,26 @@ class MainWindow(QMainWindow):
 
         resolved_file_path = file_path.resolve()
         new_sim = Simulation.load_from_file(resolved_file_path)
+        self.loaded_file_path = resolved_file_path
         self.main_widget.set_simulation(new_sim)
+        self.set_window_title()
 
-    def save_file_as(self):
-        file_name = QFileDialog.getSaveFileName(self, 'Save Simulation File', '', 'Simulation Files (*.json)')
-        if not file_name[0]:
-            return  # User canceled
-        file_path = Path(file_name[0])
+    def save_file(self):
+        self.save_file_as(self.loaded_file_path)
+
+    def save_file_as(self, file_path: Optional[Path] = None):
+        if not self.main_widget.graph_widget.simulation:
+            log.warning(f'Cannot save with no simulation loaded')
+            return
+
+        if file_path:
+            log.debug(f'Saving provided path {file_path}')
+        else:
+            file_name = QFileDialog.getSaveFileName(self, 'Save Simulation File', '', 'Simulation Files (*.json)')
+            if not file_name[0]:
+                return  # User canceled
+            file_path = Path(file_name[0])
+
         self.main_widget.graph_widget.simulation.save_to_file(file_path)
 
 
