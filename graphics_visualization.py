@@ -445,7 +445,7 @@ class QtJunction(QtNode):
 
 
 class GraphWidget(QGraphicsView):
-    def __init__(self, simulation: Simulation):
+    def __init__(self):
         super().__init__()
 
         self._timer_id = 0
@@ -460,8 +460,7 @@ class GraphWidget(QGraphicsView):
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
         self.scale(0.8, 0.8)
 
-        self.simulation = None
-        self.set_simulation(simulation)
+        self.simulation: Optional[Simulation] = None
 
     def set_simulation(self, new_simulation: Simulation):
         self.simulation = new_simulation
@@ -519,6 +518,9 @@ class GraphWidget(QGraphicsView):
         self.randomize_nodes()
 
     def advance_simulation(self) -> Tuple[bool, int]:
+        if not self.simulation:
+            log.warning(f'No simulation to advance: {self.simulation}')
+            return False, -1
         sim_finished = not self.simulation.advance()
         # Update all the fork nodes in case any junctions switched
         for item in self.scene().items():
@@ -592,10 +594,10 @@ class GraphWidget(QGraphicsView):
 
 
 class MainWidget(QWidget):
-    def __init__(self, simulation: Simulation):
+    def __init__(self):
         super().__init__()
 
-        self.graph_widget = GraphWidget(simulation)
+        self.graph_widget = GraphWidget()
 
         self.param_root = Parameter.create(name='param_root', type='group')
         self.param_one_step = parameterTypes.ActionParameter(name='One Step')
@@ -644,6 +646,9 @@ class MainWidget(QWidget):
                 log.error(f'Unknown parameter change:{param}')
 
     def step_simulation(self):
+        if not self.graph_widget.simulation:
+            log.warning(f'No simulation to step: {self.graph_widget.simulation}')
+            return
         sim_finished, sim_step_idx = self.graph_widget.advance_simulation()
         self.param_sim_step_idx.setValue(sim_step_idx)
         if sim_finished:
@@ -659,7 +664,7 @@ class MainWidget(QWidget):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, window_title: str, simulation: Simulation):
+    def __init__(self, window_title: str):
         super().__init__()
 
         self.setMinimumSize(400, 400)
@@ -681,16 +686,21 @@ class MainWindow(QMainWindow):
         self.file_menu.addAction(self.exit_action)
 
         log.debug('Creating MainWidget')
-        self.main_widget = MainWidget(simulation)
+        self.main_widget = MainWidget()
         self.setCentralWidget(self.main_widget)
 
-    def load_file(self):
-        file_name = QFileDialog.getOpenFileName(self, 'Open Simulation File', '', 'Simulation Files (*.json)')
-        if not file_name[0]:
-            return  # User canceled
-        file_path = Path(file_name[0])
-        log.debug(f'User picked path {file_path}')
-        new_sim = Simulation.load_from_file(file_path)
+    def load_file(self, file_path: Optional[Path] = None):
+        if file_path:
+            log.debug(f'Loading provided path {file_path}')
+        else:
+            file_name = QFileDialog.getOpenFileName(self, 'Open Simulation File', '', 'Simulation Files (*.json)')
+            if not file_name[0]:
+                return  # User canceled
+            file_path = Path(file_name[0])
+            log.debug(f'User picked path {file_path}')
+
+        resolved_file_path = file_path.resolve()
+        new_sim = Simulation.load_from_file(resolved_file_path)
         self.main_widget.set_simulation(new_sim)
 
     def save_file_as(self):
@@ -717,10 +727,10 @@ def excepthook(exc_type, exc_value, exc_tb):
 
 
 class MainApp:
-    def __init__(self, window_title: str, simulation: Simulation):
+    def __init__(self, window_title: str):
         log.debug('Creating QApplication')
         self.app = QApplication()
-        self.main_window = MainWindow(window_title, simulation)
+        self.main_window = MainWindow(window_title)
 
     def run(self) -> int:
         self.main_window.show()

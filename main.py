@@ -46,34 +46,12 @@ class ColouredFormatter(logging.Formatter):
 
 
 def main():
-    # Create the graph representation
-    log.debug('Creating graph')
-    graph = nx.Graph()
-    junctions = [Junction() for _ in range(11)]
-    graph.add_edge(
-        junctions[8], junctions[0], object=Track(train=Train(dest_junction=junctions[6], facing_junction=junctions[0]))
-    )
-    graph.add_edge(junctions[0], junctions[1], object=Track(signals=[TrainSignal(junctions[1])]))
-    graph.add_edge(junctions[1], junctions[9], object=Track(signals=[TrainSignal(junctions[1])]))
-    graph.add_edge(junctions[9], junctions[10], object=Track())
-    graph.add_edge(junctions[9], junctions[2], object=Track())
-    graph.add_edge(junctions[1], junctions[3], object=Track())
-    graph.add_edge(junctions[3], junctions[7], object=Track())
-    graph.add_edge(junctions[7], junctions[5], object=Track())
-    graph.add_edge(junctions[3], junctions[4], object=Track())
-    graph.add_edge(junctions[4], junctions[6], object=Track())
-    graph.add_edge(
-        junctions[10], junctions[4], object=Track(train=Train(dest_junction=junctions[5], facing_junction=junctions[10]))
-    )
-
-    log.debug('Creating simulation')
-    sim = Simulation(graph)
     default_file_path = Path('./default.json')
-    sim.save_to_file(default_file_path)
-    sim = Simulation.load_from_file(default_file_path)
 
     log.debug('Creating MainApp')
-    main_app = MainApp('Train Simulation', sim)
+    main_app = MainApp('Train Simulation')
+    main_app.main_window.load_file(default_file_path)
+
     log.debug('Running app')
     sys.exit(main_app.run())
 
