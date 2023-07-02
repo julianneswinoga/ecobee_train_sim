@@ -5,6 +5,7 @@ import signal
 import traceback
 import logging
 import random
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QGraphicsView,
     QStyle,
     QHBoxLayout,
+    QFileDialog,
 )
 from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes, interact
 
@@ -456,8 +458,18 @@ class GraphWidget(QGraphicsView):
         self.setRenderHint(QPainter.Antialiasing)
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
+        self.scale(0.8, 0.8)
 
-        self.simulation = simulation
+        self.simulation = None
+        self.set_simulation(simulation)
+
+    def set_simulation(self, new_simulation: Simulation):
+        self.simulation = new_simulation
+
+        # Clear the scene
+        for item in self.scene().items():
+            self.scene().removeItem(item)
+        self.scene().clear()
 
         graph_data = nx.to_dict_of_dicts(self.simulation.graph)
 
@@ -500,13 +512,11 @@ class GraphWidget(QGraphicsView):
 
         # Then we add all the Qt objects to the scene
         for node in nodes.values():
-            scene.addItem(node)
+            self.scene().addItem(node)
         for edge in edges:
-            scene.addItem(edge)
+            self.scene().addItem(edge)
 
         self.randomize_nodes()
-
-        self.scale(0.8, 0.8)
 
     def advance_simulation(self) -> Tuple[bool, int]:
         sim_finished = not self.simulation.advance()
@@ -587,7 +597,7 @@ class MainWidget(QWidget):
 
         self.graph_widget = GraphWidget(simulation)
 
-        param_root = Parameter.create(name='param_root', type='group')
+        self.param_root = Parameter.create(name='param_root', type='group')
         self.param_one_step = parameterTypes.ActionParameter(name='One Step')
         self.param_run_cont = parameterTypes.SimpleParameter(name='Run Continuous', type='bool', default=False)
         self.param_update_delay = parameterTypes.SliderParameter(
@@ -597,14 +607,14 @@ class MainWidget(QWidget):
         self.param_sim_step_idx = parameterTypes.SimpleParameter(
             name='Simulation Step', type='int', default=0, readonly=True
         )
-        param_root.addChild(self.param_one_step)
-        param_root.addChild(self.param_run_cont)
-        param_root.addChild(self.param_update_delay)
-        param_root.addChild(self.param_sim_step_idx)
+        self.param_root.addChild(self.param_one_step)
+        self.param_root.addChild(self.param_run_cont)
+        self.param_root.addChild(self.param_update_delay)
+        self.param_root.addChild(self.param_sim_step_idx)
         param_tree = ParameterTree()
-        param_tree.setParameters(param_root, showTop=False)
+        param_tree.setParameters(self.param_root, showTop=False)
 
-        param_root.sigTreeStateChanged.connect(self.param_change)
+        self.param_root.sigTreeStateChanged.connect(self.param_change)
 
         self.simulation_timer = QTimer(self)
         self.simulation_timer.timeout.connect(self.step_simulation)
@@ -641,6 +651,12 @@ class MainWidget(QWidget):
             self.param_run_cont.setValue(False)
             self.param_run_cont.setOpts(enabled=False)
 
+    def set_simulation(self, simulation: Simulation):
+        self.graph_widget.set_simulation(simulation)
+        for child_param in self.param_root.children():
+            child_param.setValue(child_param.defaultValue())
+            child_param.setOpts(enabled=True)
+
 
 class MainWindow(QMainWindow):
     def __init__(self, window_title: str, simulation: Simulation):
@@ -652,6 +668,10 @@ class MainWindow(QMainWindow):
         self.menu_bar = self.menuBar()
         self.file_menu = self.menu_bar.addMenu('&File')
 
+        self.load_file_action = QAction('Load')
+        self.load_file_action.triggered.connect(self.load_file)
+        self.file_menu.addAction(self.load_file_action)
+
         self.exit_action = QAction('Exit')
         self.exit_action.triggered.connect(exit_handler)
         self.file_menu.addAction(self.exit_action)
@@ -659,6 +679,15 @@ class MainWindow(QMainWindow):
         log.debug('Creating MainWidget')
         self.main_widget = MainWidget(simulation)
         self.setCentralWidget(self.main_widget)
+
+    def load_file(self):
+        file_name = QFileDialog.getOpenFileName(self, 'Open Simulation File', '', 'Simulation Files (*.json)')
+        if not file_name[0]:
+            return  # User canceled
+        file_path = Path(file_name[0])
+        log.debug(f'User picked path {file_path}')
+        new_sim = Simulation.load_from_file(file_path)
+        self.main_widget.set_simulation(new_sim)
 
 
 def exit_handler(*args):
