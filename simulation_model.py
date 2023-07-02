@@ -1,7 +1,9 @@
 import logging
 import copy
 import itertools
-from typing import Optional, Tuple, List, Dict, Set
+import json
+from typing import Optional, Tuple, List, Dict, Set, Any
+from pathlib import Path
 
 import networkx as nx
 
@@ -96,6 +98,113 @@ class Simulation:
         for train in self.get_all_trains():
             # Find routes for trains
             self.set_track_route_for_train(train)
+
+    @staticmethod
+    def load_from_file(file_path: Path) -> 'Simulation':
+        resolved_file_path = file_path.resolve()
+        log.info(f'Loading simulation from {resolved_file_path}')
+        with open(resolved_file_path, 'r') as fp:
+            dict_representation = json.load(fp)
+
+        graph = nx.Graph()
+
+        # Load the base graph
+        junction_lookup: Dict[int, Junction] = {}
+        track_lookup: Dict[int, Track] = {}
+        signal_lookup: Dict[int, TrainSignal] = {}
+        for track_dict in dict_representation['tracks']:
+            if track_dict['from'] in junction_lookup:
+                junct_from = junction_lookup[track_dict['from']]
+            else:
+                junct_from = Junction()
+                junct_from.ident = track_dict['from']  # Override the ident to make things deterministic
+                junction_lookup[junct_from.ident] = junct_from
+            if track_dict['to'] in junction_lookup:
+                junct_to = junction_lookup[track_dict['to']]
+            else:
+                junct_to = Junction()
+                junct_to.ident = track_dict['to']  # Override the ident to make things deterministic
+                junction_lookup[junct_to.ident] = junct_to
+
+            train_signal_list: List[TrainSignal] = []
+            if 'train_signals' in track_dict.keys():
+                for signal_ident_str, signal_dict in track_dict['train_signals'].items():
+                    signal_ident = int(signal_ident_str)
+                    if signal_ident in signal_lookup:
+                        train_signal = signal_lookup[signal_ident]
+                    else:
+                        attached_junction = junction_lookup[signal_dict['junct_id']]
+                        signal_state = True if signal_dict['state'] == 'green' else False
+                        train_signal = TrainSignal(attached_junction=attached_junction)
+                        train_signal.ident = signal_ident  # Override the ident to make things deterministic
+                        train_signal.signal_state = signal_state
+                    train_signal_list.append(train_signal)
+
+            if track_dict['track_id'] in track_lookup:
+                track = track_lookup[track_dict['track_id']]
+            else:
+                track = Track(signals=train_signal_list)  # Trains get set later
+                track.ident = track_dict['track_id']  # Override the ident to make things deterministic
+                track_lookup[track.ident] = track
+            graph.add_edge(junct_from, junct_to, object=track)
+
+        # Load train information
+        train_lookup: Dict[int, Train] = {}
+        for train_ident_str, train_dict in dict_representation['trains'].items():
+            train_ident = int(train_ident_str)
+            dest_junction = junction_lookup[train_dict['dest_junction']]
+            facing_junction = junction_lookup[train_dict['facing_junction']]
+            train = Train(dest_junction=dest_junction, facing_junction=facing_junction)
+            train.ident = train_ident  # Override the ident to make things deterministic
+            train_lookup[train_ident] = train
+
+        # Set train information in track objects
+        for track_dict in dict_representation['tracks']:
+            if 'train_id' not in track_dict.keys():
+                continue
+            track = track_lookup[track_dict['track_id']]
+            track.train = train_lookup[track_dict['train_id']]
+
+        sim = Simulation(graph)
+        return sim
+
+    def save_to_file(self, file_path: Path):
+        resolved_file_path = file_path.resolve()
+        log.info(f'Saving simulation to {resolved_file_path}')
+
+        tracks_list: List[Dict[str, int]] = []
+        for edge_tup in self.graph.edges:
+            track: Track = self.graph.edges[edge_tup]['object']
+            track_dict = {
+                'from': edge_tup[0].ident,
+                'to': edge_tup[1].ident,
+                'track_id': track.ident,
+            }
+            if track.train:
+                track_dict['train_id'] = track.train.ident
+            if track.train_signals:
+                train_signals_dict: Dict[int, Dict[str]] = {}
+                for train_signal in track.train_signals:
+                    train_signals_dict[train_signal.ident] = {
+                        'junct_id': train_signal.attached_junction.ident,
+                        'state': 'green' if train_signal.signal_state else 'red',
+                    }
+                track_dict['train_signals'] = train_signals_dict
+            tracks_list.append(track_dict)
+        trains_dict: Dict[int, Dict[str, int]] = {}
+        for train in self.get_all_trains():
+            train_dict = {
+                'facing_junction': train.facing_junction.ident,
+                'dest_junction': train.dest_junction.ident,
+            }
+            trains_dict[train.ident] = train_dict
+
+        dict_representation = {
+            'tracks': tracks_list,
+            'trains': trains_dict,
+        }
+        with open(resolved_file_path, 'w') as fp:
+            json.dump(dict_representation, fp, ensure_ascii=True, indent=4, sort_keys=True)
 
     def get_junction_behind_train(self, train: Train):
         adj_junctions: Optional[Tuple[Junction, Junction]] = None

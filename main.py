@@ -4,6 +4,7 @@ import argparse
 import logging
 import colorama
 import sys
+from pathlib import Path
 
 import networkx as nx
 
@@ -67,6 +68,9 @@ def main():
 
     log.debug('Creating simulation')
     sim = Simulation(graph)
+    default_file_path = Path('./default.json')
+    sim.save_to_file(default_file_path)
+    sim = Simulation.load_from_file(default_file_path)
 
     log.debug('Creating MainApp')
     main_app = MainApp('Train Simulation', sim)

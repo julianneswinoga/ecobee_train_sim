@@ -1,0 +1,83 @@
+{
+    "tracks": [
+        {
+            "from": 8,
+            "to": 0,
+            "track_id": 12,
+            "train_id": 11
+        },
+        {
+            "from": 0,
+            "to": 1,
+            "track_id": 14,
+            "train_signals": {
+                "13": {
+                    "junct_id": 1,
+                    "state": "red"
+                }
+            }
+        },
+        {
+            "from": 1,
+            "to": 9,
+            "track_id": 16,
+            "train_signals": {
+                "15": {
+                    "junct_id": 1,
+                    "state": "red"
+                }
+            }
+        },
+        {
+            "from": 1,
+            "to": 3,
+            "track_id": 19
+        },
+        {
+            "from": 9,
+            "to": 10,
+            "track_id": 17
+        },
+        {
+            "from": 9,
+            "to": 2,
+            "track_id": 18
+        },
+        {
+            "from": 10,
+            "to": 4,
+            "track_id": 25,
+            "train_id": 24
+        },
+        {
+            "from": 3,
+            "to": 7,
+            "track_id": 20
+        },
+        {
+            "from": 3,
+            "to": 4,
+            "track_id": 22
+        },
+        {
+            "from": 7,
+            "to": 5,
+            "track_id": 21
+        },
+        {
+            "from": 4,
+            "to": 6,
+            "track_id": 23
+        }
+    ],
+    "trains": {
+        "11": {
+            "dest_junction": 6,
+            "facing_junction": 0
+        },
+        "24": {
+            "dest_junction": 5,
+            "facing_junction": 10
+        }
+    }
+}
