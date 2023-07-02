@@ -173,7 +173,8 @@ class Simulation:
         log.info(f'Saving simulation to {resolved_file_path}')
 
         tracks_list: List[Dict[str, int]] = []
-        for edge_tup in self.graph.edges:
+        sorted_graph_edges = sorted(self.graph.edges, key=lambda e_t: self.graph.edges[e_t]['object'].ident)
+        for edge_tup in sorted_graph_edges:
             track: Track = self.graph.edges[edge_tup]['object']
             track_dict = {
                 'from': edge_tup[0].ident,

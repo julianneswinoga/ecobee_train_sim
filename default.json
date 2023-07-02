@@ -29,11 +29,6 @@
             }
         },
         {
-            "from": 1,
-            "to": 3,
-            "track_id": 19
-        },
-        {
             "from": 9,
             "to": 10,
             "track_id": 17
@@ -44,10 +39,9 @@
             "track_id": 18
         },
         {
-            "from": 10,
-            "to": 4,
-            "track_id": 25,
-            "train_id": 24
+            "from": 1,
+            "to": 3,
+            "track_id": 19
         },
         {
             "from": 3,
@@ -55,19 +49,25 @@
             "track_id": 20
         },
         {
-            "from": 3,
-            "to": 4,
-            "track_id": 22
-        },
-        {
             "from": 7,
             "to": 5,
             "track_id": 21
         },
         {
+            "from": 3,
+            "to": 4,
+            "track_id": 22
+        },
+        {
             "from": 4,
             "to": 6,
             "track_id": 23
+        },
+        {
+            "from": 10,
+            "to": 4,
+            "track_id": 25,
+            "train_id": 24
         }
     ],
     "trains": {
