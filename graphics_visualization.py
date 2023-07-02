@@ -148,26 +148,24 @@ class QtTrain(QGraphicsItem):
         self.bounds = body_rect.united(text_bounds).united(front_rect)
 
 
-track_line_colour_lookup: Dict[Train, Qt.GlobalColor] = {}
-next_colour_idx: int = 0
-all_track_line_colours = [
-    QColor.fromString('#FF7F11'),
-    QColor.fromString('#2F97C1'),
-    QColor.fromString('#587291'),
-    QColor.fromString('#15E6CD'),
-]
+def random_qcolor_generator(seed: int = 0):
+    r = random.Random(seed)  # Create prng generator with a constant seed
+    while True:
+        yield QColor.fromRgbF(r.random(), r.random(), r.random(), 1.0)
+
+
+# Start the colour generator
+random_qcolor_generator = random_qcolor_generator()
+track_line_colour_lookup: Dict[int, Qt.GlobalColor] = {}
 
 
 def get_track_line_colour(track_line: Train) -> Qt.GlobalColor:
     global track_line_colour_lookup
-    try:
-        return track_line_colour_lookup[track_line]
-    except KeyError:
-        global next_colour_idx
-        next_colour = all_track_line_colours[next_colour_idx]
-        track_line_colour_lookup[track_line] = next_colour
-        next_colour_idx += 1
-        return next_colour
+    train_ident = track_line.ident
+    if train_ident not in track_line_colour_lookup:
+        track_line_colour_lookup[train_ident] = next(random_qcolor_generator)
+        log.debug(f'Created train colour {track_line_colour_lookup[train_ident]}')
+    return track_line_colour_lookup[train_ident]
 
 
 class QtTrack(QtEdge):
