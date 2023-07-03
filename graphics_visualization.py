@@ -6,7 +6,7 @@ import traceback
 import logging
 import random
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Generator
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
@@ -44,20 +44,6 @@ class QtEdge(QGraphicsItem):
         self.dest: weakref.ReferenceType[QtNode] = weakref.ref(dest_node)
         self.source().add_edge(self)
         self.dest().add_edge(self)
-        self.adjust()
-
-    def source_node(self) -> weakref.ReferenceType['QtNode']:
-        return self.source()
-
-    def set_source_node(self, node: 'QtNode'):
-        self.source = weakref.ref(node)
-        self.adjust()
-
-    def dest_node(self) -> weakref.ReferenceType['QtNode']:
-        return self.dest()
-
-    def set_dest_node(self, node: 'QtNode'):
-        self.dest = weakref.ref(node)
         self.adjust()
 
     def adjust(self):
@@ -110,10 +96,10 @@ class QtTrain(QGraphicsItem):
         front_rect = QRectF(body_rect.x(), body_rect.y(), 5, 10)
 
         facing_sim_junction = parent_item.track.train.facing_junction
-        if parent_item.source_node().junction == facing_sim_junction:
-            facing_qt_junction = parent_item.source_node()
-        elif parent_item.dest_node().junction == facing_sim_junction:
-            facing_qt_junction = parent_item.dest_node()
+        if parent_item.source().junction == facing_sim_junction:
+            facing_qt_junction = parent_item.source()
+        elif parent_item.dest().junction == facing_sim_junction:
+            facing_qt_junction = parent_item.dest()
         else:
             raise IndexError(f'No facing junction for {parent_item.track.train}')
 
@@ -148,7 +134,7 @@ class QtTrain(QGraphicsItem):
         self.bounds = body_rect.united(text_bounds).united(front_rect)
 
 
-def random_qcolor_generator(seed: int = 0):
+def random_qcolor_generator(seed: int = 0) -> Generator[QColor, None, None]:
     r = random.Random(seed)  # Create prng generator with a constant seed
     while True:
         yield QColor.fromRgbF(r.random(), r.random(), r.random(), 1.0)
@@ -156,10 +142,10 @@ def random_qcolor_generator(seed: int = 0):
 
 # Start the colour generator
 random_qcolor_generator = random_qcolor_generator()
-track_line_colour_lookup: Dict[int, Qt.GlobalColor] = {}
+track_line_colour_lookup: Dict[int, QColor] = {}
 
 
-def get_track_line_colour(track_line: Train) -> Qt.GlobalColor:
+def get_track_line_colour(track_line: Train) -> QColor:
     global track_line_colour_lookup
     train_ident = track_line.ident
     if train_ident not in track_line_colour_lookup:
@@ -222,9 +208,9 @@ class QtTrack(QtEdge):
             signal_sim_junction = train_signal.attached_junction
             # connecting_line is always from source to dest, so we cheat a bit to not
             # have to figure out the geomerty from scratch again
-            if self.source_node().junction == signal_sim_junction:
+            if self.source().junction == signal_sim_junction:
                 signal_point = self.connecting_line.p1()
-            elif self.dest_node().junction == signal_sim_junction:
+            elif self.dest().junction == signal_sim_junction:
                 signal_point = self.connecting_line.p2()
             else:
                 raise IndexError(f'No attached junction for {train_signal}')
@@ -308,10 +294,10 @@ class QtNode(QGraphicsItem):
         # Now subtract all forces pulling items together.
         weight = (len(self._edge_list) + 1) * 10.0
         for edge in self._edge_list:
-            if edge().source_node() is self:
-                pos = self.mapFromItem(edge().dest_node(), 0, 0)
+            if edge().source() is self:
+                pos = self.mapFromItem(edge().dest(), 0, 0)
             else:
-                pos = self.mapFromItem(edge().source_node(), 0, 0)
+                pos = self.mapFromItem(edge().source(), 0, 0)
             xvel += pos.x() / weight
             yvel += pos.y() / weight
 
@@ -377,8 +363,8 @@ class QtJunction(QtNode):
         # Find the two edges from the fork identifiers
         qt_node_forks = []
         for qt_edge in self._edge_list:
-            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source_node()
-            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest_node()
+            edge_node1: weakref.ReferenceType[QtNode] = qt_edge().source()
+            edge_node2: weakref.ReferenceType[QtNode] = qt_edge().dest()
             switch_junct1, switch_junct2 = self.junction.get_switch_state()
             # forks could be the same, can't use elif or compact into a single if
             if edge_node1.junction == switch_junct1:
@@ -490,7 +476,7 @@ class GraphWidget(QGraphicsView):
                 # Skip any edges that already connect the two nodes
                 edge_already_connected = False
                 for edge in edges:
-                    edge_node_tup = (edge.source_node().junction, edge.dest_node().junction)
+                    edge_node_tup = (edge.source().junction, edge.dest().junction)
                     source_already_connected = node_start_obj in edge_node_tup
                     dest_already_connected = node_end_obj in edge_node_tup
                     if source_already_connected and dest_already_connected:
