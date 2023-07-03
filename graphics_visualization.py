@@ -35,8 +35,6 @@ class QtEdge(QGraphicsItem):
     def __init__(self, source_node: 'QtNode', dest_node: 'QtNode'):
         super().__init__()
 
-        self._source_point = QPointF()
-        self._dest_point = QPointF()
         self.connecting_line = QLineF()
         self.bounds = QRectF()
         self.setAcceptedMouseButtons(Qt.NoButton)
@@ -60,9 +58,9 @@ class QtEdge(QGraphicsItem):
         edge_offset = QPointF((line.dx() * 10) / length, (line.dy() * 10) / length)
 
         self.prepareGeometryChange()
-        self._source_point = line.p1() + edge_offset
-        self._dest_point = line.p2() - edge_offset
-        self.connecting_line = QLineF(self._source_point, self._dest_point)
+        source_point = line.p1() + edge_offset
+        dest_point = line.p2() - edge_offset
+        self.connecting_line = QLineF(source_point, dest_point)
 
     def boundingRect(self):
         return self.bounds
