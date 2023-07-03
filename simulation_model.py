@@ -2,7 +2,7 @@ import logging
 import copy
 import itertools
 import json
-from typing import Optional, Tuple, List, Dict, Set, Any
+from typing import Optional, Tuple, List, Dict, Set
 from pathlib import Path
 
 import networkx as nx
@@ -15,19 +15,33 @@ _next_ident: int = 0
 
 class SimObject:
     def __init__(self):
+        """
+        Base simulation object that should be subclassed
+        """
         global _next_ident
         self.ident = _next_ident
         _next_ident += 1
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """
+        :return: "programmer" string representation
+        """
         return f'{self.__class__.__name__}({self.ident})'
 
-    def __str__(self):
+    def __str__(self) -> str:
+        """
+        :return: User string representation
+        """
         return self.__repr__()
 
 
 class Train(SimObject):
     def __init__(self, dest_junction: 'Junction', facing_junction: 'Junction'):
+        """
+        Simulation representation of a train
+        :param dest_junction: The destination junction that this train should route towards
+        :param facing_junction: The current junction that the train is facing (i.e. the direction)
+        """
         super().__init__()
         self.dest_junction = dest_junction
         self.facing_junction = facing_junction
@@ -35,6 +49,10 @@ class Train(SimObject):
 
 class TrainSignal(SimObject):
     def __init__(self, attached_junction: 'Junction'):
+        """
+        Simulation representation of a train signal
+        :param attached_junction: The junction the signal is attached to
+        """
         super().__init__()
         self.attached_junction: Junction = attached_junction
         self.signal_state: bool = False
@@ -42,6 +60,11 @@ class TrainSignal(SimObject):
 
 class Track(SimObject):
     def __init__(self, train: Optional[Train] = None, signals: Optional[List[TrainSignal]] = None):
+        """
+        Simulation representation of a train track
+        :param train: Optionally a train if there is currently a train on the track
+        :param signals: List of train signals that are on this track
+        """
         super().__init__()
         self.train: Optional[Train] = train
         self.train_signals: List[TrainSignal] = signals if signals else []
@@ -50,16 +73,28 @@ class Track(SimObject):
 
 class Junction(SimObject):
     def __init__(self):
+        """
+        Simulation representation of a train junction
+        """
         super().__init__()
         self.switch_state: Optional[Tuple[Junction, Junction]] = None
         self.connected_junctions: List[Junction] = []
 
     def get_switch_state(self) -> Tuple['Junction', 'Junction']:
+        """
+        Get the current switch state tuple
+        :return: This Junctions switch state
+        """
         if self.switch_state is None:
             raise IndexError(f'{self}\'s switch state is not set yet')
         return self.switch_state
 
     def set_switch_state(self, junct1: 'Junction', junct2: 'Junction'):
+        """
+        Set this Junctions switch state
+        :param junct1: First switch connecting Junction
+        :param junct2: Second switch connecting Junction
+        """
         new_switch_state = (junct1, junct2)
         log.info(f'Switching {self} from {self.switch_state} to {new_switch_state}')
         if junct1 not in self.connected_junctions:
@@ -71,12 +106,19 @@ class Junction(SimObject):
 
 class Simulation:
     def __init__(self, graph: nx.Graph):
+        """
+        Class that encompasses a train network simulation
+        :param graph: NetworkX graph the simulation uses as a base representation
+        """
         self.graph = graph
         self.step = 0
 
         self._initial_property_setup()
 
     def _initial_property_setup(self):
+        """
+        Initial setup that needs to be done when first instantiated
+        """
         # set initial switch states
         junctions = self.graph.nodes
         for junction in junctions:
@@ -101,6 +143,11 @@ class Simulation:
 
     @staticmethod
     def load_from_file(file_path: Path) -> 'Simulation':
+        """
+        Create a simulation from a json file
+        :param file_path: Path to the json simulation file
+        :return: Simulation class instance
+        """
         resolved_file_path = file_path.resolve()
         log.info(f'Loading simulation from {resolved_file_path}')
         with open(resolved_file_path, 'r') as fp:
@@ -169,6 +216,10 @@ class Simulation:
         return sim
 
     def save_to_file(self, file_path: Path):
+        """
+        Save a simulation to a json file
+        :param file_path: Path to save the json file to
+        """
         resolved_file_path = file_path.resolve()
         log.info(f'Saving simulation to {resolved_file_path}')
 
@@ -208,6 +259,11 @@ class Simulation:
             json.dump(dict_representation, fp, ensure_ascii=True, indent=4, sort_keys=True)
 
     def get_junction_behind_train(self, train: Train):
+        """
+        Get the junction that is currently behind the train
+        :param train: Train to get the junction behind
+        :return: Junction behind train
+        """
         adj_junctions: Optional[Tuple[Junction, Junction]] = None
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -225,6 +281,14 @@ class Simulation:
         return rear_junction
 
     def get_sorted_junctions_for_route(self, train: Train) -> List[Junction]:
+        """
+        Look at all the tracks that have this train routed on them, look at the Junctions
+        attached to those tracks, and sort the Junctions from the current train position
+        to the train's destination.
+        Note that the Junction behind the train is considered part of the route
+        :param train: Train to get the route for
+        :return: List of junction on the train's route
+        """
         junctions_on_route: Set[Junction] = set()
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -251,7 +315,12 @@ class Simulation:
         return sorted_junctions_on_route
 
     def get_tracks_for_junction_path(self, junction_path: List[Junction]) -> List[Track]:
-        # Create a copy so we don't modify the callers list
+        """
+        Get all the tracks for a list of Junctions
+        :param junction_path: List of Junctions to get the Tracks for
+        :return: List of Tracks
+        """
+        # Create a copy, so we don't modify the callers list
         junction_path_copy = copy.copy(junction_path)
         path_edge_tuples: List[Tuple[Junction, Junction]] = [(junction_path_copy.pop(0), junction_path_copy.pop(0))]
         while True:
@@ -353,6 +422,10 @@ class Simulation:
             path_track.trains_routed_along_track.add(train)
 
     def get_all_tracks(self) -> List[Track]:
+        """
+        Get all the Tracks in the graph
+        :return: List of Tracks in the graph
+        """
         all_tracks: List[Track] = []
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -360,6 +433,10 @@ class Simulation:
         return all_tracks
 
     def get_all_trains(self) -> List[Train]:
+        """
+        Get all the Trains in the graph
+        :return: List of Trains in the graph
+        """
         all_trains: List[Train] = []
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -398,6 +475,11 @@ class Simulation:
         return more_updates_required
 
     def get_edge_tup_for_train(self, train: Train) -> Tuple[Junction, Junction]:
+        """
+        Get the edge tuple (pair of Junctions) the train is on
+        :param train: Train to get the edge for
+        :return: Tuple of Junctions (i.e. an edge) the Train is on
+        """
         train_edge: Optional[Tuple[Junction, Junction]] = None
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
@@ -410,6 +492,12 @@ class Simulation:
 
     @staticmethod
     def get_signal(track: Track, junction: Junction) -> Optional[TrainSignal]:
+        """
+        Find the Train Signal attached to a track and Junction
+        :param track: Track the Train Signal is part of
+        :param junction: Junction the Train Signal is attached to
+        :return: Train Signal on the Track attached to the Junction
+        """
         for train_signal in track.train_signals:
             if train_signal.attached_junction == junction:
                 return train_signal

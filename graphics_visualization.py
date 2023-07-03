@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple, Any
 
 import networkx as nx
 from PySide6.QtCore import QLineF, QPointF, QRectF, Qt, qAbs, QTimer
-from PySide6.QtGui import QPainter, QPainterPath, QPen, QTransform, QColor, QAction
+from PySide6.QtGui import QPainter, QPainterPath, QPen, QColor, QAction
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -22,9 +22,9 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QFileDialog,
 )
-from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes, interact
+from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes
 
-from simulation_model import SimObject, Train, TrainSignal, Track, Junction, Simulation
+from simulation_model import SimObject, Train, Track, Junction, Simulation
 
 log = logging.getLogger('graphics_visualization')
 

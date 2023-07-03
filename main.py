@@ -6,10 +6,7 @@ import colorama
 import sys
 from pathlib import Path
 
-import networkx as nx
-
 from graphics_visualization import MainApp
-from simulation_model import Train, TrainSignal, Track, Junction, Simulation
 
 log = logging.getLogger('main')
 
@@ -29,7 +26,17 @@ parser.add_argument(
 
 
 class ColouredFormatter(logging.Formatter):
-    def format(self, record):
+    """
+    Superclass of a logging formatter to colourize the logs according to logging level
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Override the default formatting of a log record to add colour, before
+        passing it to the default formatter
+        :param record: Log record to format
+        :return: Colourized string of a log record
+        """
         level_to_colour_code = {
             logging.DEBUG: colorama.Style.DIM + colorama.Fore.BLUE,
             logging.INFO: colorama.Style.DIM + colorama.Fore.GREEN,
@@ -46,6 +53,9 @@ class ColouredFormatter(logging.Formatter):
 
 
 def main():
+    """
+    Main script function
+    """
     default_file_path = Path('./default.json')
 
     log.debug('Creating MainApp')
