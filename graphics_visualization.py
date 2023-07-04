@@ -55,11 +55,11 @@ class QtEdge(QGraphicsItem):
         if length == 0.0:
             return
 
-        edge_offset = QPointF((line.dx() * 10) / length, (line.dy() * 10) / length)
-
         self.prepareGeometryChange()
-        source_point = line.p1() + edge_offset
-        dest_point = line.p2() - edge_offset
+        source_offset = self.source().circle_radius / 2
+        dest_offset = self.dest().circle_radius / 2
+        source_point = line.p1() + QPointF((line.dx() * source_offset) / length, (line.dy() * source_offset) / length)
+        dest_point = line.p2() - QPointF((line.dx() * dest_offset) / length, (line.dy() * dest_offset) / length)
         self.connecting_line = QLineF(source_point, dest_point)
 
     def boundingRect(self):
@@ -257,6 +257,10 @@ class QtNode(QGraphicsItem):
         self._edge_list: List[weakref.ReferenceType[QtEdge]] = []
         self._new_pos = QPointF()
         self.bounds = QRectF()
+        self.circle_radius = 20
+        self.circle_bounds = QRectF(
+            -self.circle_radius / 2, -self.circle_radius / 2, self.circle_radius, self.circle_radius
+        )
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
@@ -265,9 +269,6 @@ class QtNode(QGraphicsItem):
     def add_edge(self, edge):
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
-
-    def edges(self) -> List[weakref.ReferenceType[QtEdge]]:
-        return self._edge_list
 
     def calculate_forces(self):
         if not self.scene() or self.scene().mouseGrabberItem() is self:
@@ -304,8 +305,13 @@ class QtNode(QGraphicsItem):
 
         scene_rect = self.scene().sceneRect()
         self._new_pos = self.pos() + QPointF(xvel, yvel)
-        self._new_pos.setX(min(max(self._new_pos.x(), scene_rect.left() + 10), scene_rect.right() - 10))
-        self._new_pos.setY(min(max(self._new_pos.y(), scene_rect.top() + 10), scene_rect.bottom() - 10))
+        radius_offset = self.circle_radius / 2
+        self._new_pos.setX(
+            min(max(self._new_pos.x(), scene_rect.left() + radius_offset), scene_rect.right() - radius_offset)
+        )
+        self._new_pos.setY(
+            min(max(self._new_pos.y(), scene_rect.top() + radius_offset), scene_rect.bottom() - radius_offset)
+        )
 
     def advance(self):
         if self._new_pos == self.pos():
@@ -319,7 +325,7 @@ class QtNode(QGraphicsItem):
 
     def shape(self):
         path = QPainterPath()
-        path.addEllipse(-10, -10, 20, 20)
+        path.addEllipse(self.circle_bounds)
         return path
 
     def paint(self, painter, option, widget):
@@ -330,9 +336,8 @@ class QtNode(QGraphicsItem):
             painter.setBrush(Qt.yellow)
         else:
             painter.setBrush(Qt.darkGray)
-        ellipse_bounds = QRectF(-10, -10, 20, 20)
-        painter.drawEllipse(ellipse_bounds)
-        self.bounds = ellipse_bounds
+        painter.drawEllipse(self.circle_bounds)
+        self.bounds = self.circle_bounds
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.ItemPositionChange:
@@ -395,8 +400,7 @@ class QtJunction(QtNode):
             painter.setBrush(Qt.yellow)
         else:
             painter.setBrush(Qt.darkGray)
-        ellipse_bounds = QRectF(-10, -10, 20, 20)
-        painter.drawEllipse(ellipse_bounds)
+        painter.drawEllipse(self.circle_bounds)
 
         # Draw text
         font = painter.font()
@@ -405,7 +409,7 @@ class QtJunction(QtNode):
         painter.setFont(font)
         painter.setPen(QPen(Qt.black))
         text_bounds = painter.fontMetrics().boundingRect(text)
-        text_bounds.moveTo(ellipse_bounds.center().toPoint())
+        text_bounds.moveTo(self.circle_bounds.center().toPoint())
         # text_bounds.setWidth(500)  # TODO: Sometimes fontMetrics.boundingRect returns an incorrect width?
         painter.drawText(text_bounds, text)
 
@@ -414,8 +418,8 @@ class QtJunction(QtNode):
             qt_node_fork1, qt_node_fork2 = self.fork_qt_notes
             line1 = QLineF(QPointF(0, 0), self.mapFromItem(qt_node_fork1, QPointF(0, 0)))
             line2 = QLineF(QPointF(0, 0), self.mapFromItem(qt_node_fork2, QPointF(0, 0)))
-            line1.setLength(10)  # TODO: Generalize node size
-            line2.setLength(10)
+            line1.setLength(self.circle_radius / 2)
+            line2.setLength(self.circle_radius / 2)
             painter.setPen(QPen(Qt.red))
             painter.drawLine(line1)
             painter.drawLine(line2)
@@ -423,7 +427,7 @@ class QtJunction(QtNode):
             log.error(f'No fork nodes for {self.junction.ident}')
 
         # calculate item bounds
-        self.bounds = ellipse_bounds.united(text_bounds)
+        self.bounds = self.circle_bounds.united(text_bounds)
 
 
 class GraphWidget(QGraphicsView):
