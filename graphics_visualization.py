@@ -574,7 +574,8 @@ class GraphWidget(QGraphicsView):
 
         scene = QGraphicsScene(self)
         scene.setItemIndexMethod(QGraphicsScene.NoIndex)
-        scene.setSceneRect(-200, -200, 400, 400)
+        self.scene_size = 1000
+        scene.setSceneRect(-self.scene_size / 2, -self.scene_size / 2, self.scene_size, self.scene_size)
         self.setScene(scene)
         self.setCacheMode(QGraphicsView.CacheBackground)
         self.setRenderHint(QPainter.Antialiasing)
