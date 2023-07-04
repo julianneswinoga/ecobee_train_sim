@@ -593,7 +593,8 @@ class GraphWidget(QGraphicsView):
 
         # Clear the scene
         for item in self.scene().items():
-            self.scene().removeItem(item)
+            if item.parentItem() is not None:
+                self.scene().removeItem(item)
         self.scene().clear()
 
         graph_data = nx.to_dict_of_dicts(self.simulation.graph)
