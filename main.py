@@ -22,6 +22,14 @@ parser.add_argument(
     default='WARNING',
     help='Set the logging level, one of %(choices)s (default %(default)s)',
 )
+parser.add_argument(
+    'file_to_load',
+    metavar='FILE',
+    type=Path,
+    nargs='?',
+    default=Path('default.json').resolve(),
+    help='File to load on startup (default %(default)s)',
+)
 
 
 class ColouredFormatter(logging.Formatter):
@@ -55,11 +63,9 @@ def main():
     """
     Main script function
     """
-    default_file_path = Path('./default.json')
-
     log.debug('Creating MainApp')
     main_app = MainApp('Train Simulation')
-    main_app.main_window.load_file(default_file_path)
+    main_app.main_window.load_file(args.file_to_load)
 
     log.debug('Running app')
     sys.exit(main_app.run())
