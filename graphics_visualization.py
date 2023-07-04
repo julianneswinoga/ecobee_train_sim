@@ -49,6 +49,7 @@ class QtEdge(QGraphicsItem):
         self.source().add_edge(self)
         self.dest().add_edge(self)
         self.adjust()
+        self.show_debug = False
 
     def adjust(self):
         """
@@ -107,6 +108,7 @@ class QtTrain(QGraphicsItem):
         super().__init__(parent)
         self.train_colour: Qt.GlobalColor = train_colour
         self.bounds = QRectF()
+        self.show_debug = False
 
     def boundingRect(self) -> QRectF:
         """
@@ -152,13 +154,16 @@ class QtTrain(QGraphicsItem):
         painter.setBrush(self.train_colour)
         painter.drawRect(front_rect)
 
-        font = painter.font()
-        text = f'Train{parent_item.track.train.ident}'
-        font.setPointSize(6)
-        painter.setFont(font)
-        text_bounds = painter.fontMetrics().boundingRect(text)
-        text_bounds.moveTo(parent_center.toPoint())
-        painter.drawText(text_bounds, 0, text)
+        if self.show_debug:
+            font = painter.font()
+            text = f'Train{parent_item.track.train.ident}'
+            font.setPointSize(6)
+            painter.setFont(font)
+            text_bounds = painter.fontMetrics().boundingRect(text)
+            text_bounds.moveTo(parent_center.toPoint())
+            painter.drawText(text_bounds, 0, text)
+        else:
+            text_bounds = QRectF()
 
         # Increase bounds a bit, else some minor artefact show
         siz = body_rect.size()
@@ -278,23 +283,27 @@ class QtTrack(QtEdge):
             signal_ellipse_bounds.append(signal_ellipse_bound)
 
             # Signal text
-            text = f'Sig{train_signal.ident}'
-            font.setPointSize(5)
+            if self.show_debug:
+                text = f'Sig{train_signal.ident}'
+                font.setPointSize(5)
+                painter.setFont(font)
+                painter.setPen(Qt.black)
+                text_bounds = painter.fontMetrics().boundingRect(text)
+                text_bounds.moveTo(signal_ellipse_bound.center().toPoint())
+                painter.drawText(text_bounds, 0, text)
+                signal_ellipse_bounds.append(text_bounds)
+
+        # Draw text
+        if self.show_debug:
+            text = f'Track({self.track.ident})'
+            font.setPointSize(8)
             painter.setFont(font)
             painter.setPen(Qt.black)
             text_bounds = painter.fontMetrics().boundingRect(text)
-            text_bounds.moveTo(signal_ellipse_bound.center().toPoint())
+            text_bounds.moveTo(line_bounds.center().toPoint())
             painter.drawText(text_bounds, 0, text)
-            signal_ellipse_bounds.append(text_bounds)
-
-        # Draw text
-        text = f'Track({self.track.ident})'
-        font.setPointSize(8)
-        painter.setFont(font)
-        painter.setPen(Qt.black)
-        text_bounds = painter.fontMetrics().boundingRect(text)
-        text_bounds.moveTo(line_bounds.center().toPoint())
-        painter.drawText(text_bounds, 0, text)
+        else:
+            text_bounds = QRectF()
 
         total_bounds = line_bounds.united(text_bounds)
         for track_line_bound in track_line_bounds:
@@ -326,6 +335,7 @@ class QtNode(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setZValue(-1)
+        self.show_debug = False
 
     def add_edge(self, edge: QtEdge):
         """
@@ -522,15 +532,18 @@ class QtJunction(QtNode):
         painter.drawEllipse(self.circle_bounds)
 
         # Draw text
-        font = painter.font()
-        text = f'Junction({self.junction.ident})'
-        font.setPointSize(8)
-        painter.setFont(font)
-        painter.setPen(QPen(Qt.black))
-        text_bounds = painter.fontMetrics().boundingRect(text)
-        text_bounds.moveTo(self.circle_bounds.center().toPoint())
-        # text_bounds.setWidth(500)  # TODO: Sometimes fontMetrics.boundingRect returns an incorrect width?
-        painter.drawText(text_bounds, text)
+        if self.show_debug:
+            font = painter.font()
+            text = f'Junction({self.junction.ident})'
+            font.setPointSize(8)
+            painter.setFont(font)
+            painter.setPen(QPen(Qt.black))
+            text_bounds = painter.fontMetrics().boundingRect(text)
+            text_bounds.moveTo(self.circle_bounds.center().toPoint())
+            # text_bounds.setWidth(500)  # TODO: Sometimes fontMetrics.boundingRect returns an incorrect width?
+            painter.drawText(text_bounds, text)
+        else:
+            text_bounds = QRectF()
 
         # Draw fork
         if self.fork_qt_notes is not None:
@@ -757,10 +770,12 @@ class MainWidget(QWidget):
         self.param_sim_step_idx = parameterTypes.SimpleParameter(
             name='Simulation Step', type='int', default=0, readonly=True
         )
+        self.param_show_dbg_txt = parameterTypes.SimpleParameter(name='Show debug text', type='bool', default=False)
         self.param_root.addChild(self.param_one_step)
         self.param_root.addChild(self.param_run_cont)
         self.param_root.addChild(self.param_update_delay)
         self.param_root.addChild(self.param_sim_step_idx)
+        self.param_root.addChild(self.param_show_dbg_txt)
         param_tree = ParameterTree()
         param_tree.setParameters(self.param_root, showTop=False)
 
@@ -795,6 +810,10 @@ class MainWidget(QWidget):
                 self.simulation_timer.setInterval(self.param_update_delay.value())
             elif param == self.param_sim_step_idx:
                 pass  # Only updated internally
+            elif param == self.param_show_dbg_txt:
+                for item in self.graph_widget.scene().items():
+                    if hasattr(item, 'show_debug'):
+                        item.show_debug = True if data is True else False
             else:
                 log.error(f'Unknown parameter change:{param}')
 
