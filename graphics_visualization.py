@@ -901,7 +901,11 @@ class MainWindow(QMainWindow):
             log.debug(f'User picked path {file_path}')
 
         resolved_file_path = file_path.resolve()
-        new_sim = Simulation.load_from_file(resolved_file_path)
+        try:
+            new_sim = Simulation.load_from_file(resolved_file_path)
+        except Exception as e:
+            log.error(f'Could not load {resolved_file_path}: {e}')
+            return
         self.loaded_file_path = resolved_file_path
         self.main_widget.set_simulation(new_sim)
         self.set_window_title()
