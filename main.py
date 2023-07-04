@@ -11,8 +11,7 @@ from graphics_visualization import MainApp
 log = logging.getLogger('main')
 
 parser = argparse.ArgumentParser(
-    # TODO: program description
-    description=""""""
+    description="""Simulate a network of trains/signals/forks, with a graphical interface"""
 )
 parser.add_argument(
     '-l',

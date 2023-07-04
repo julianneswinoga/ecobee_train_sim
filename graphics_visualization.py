@@ -541,7 +541,6 @@ class QtJunction(QtNode):
             painter.setPen(QPen(Qt.black))
             text_bounds = painter.fontMetrics().boundingRect(text)
             text_bounds.moveTo(self.circle_bounds.center().toPoint())
-            # text_bounds.setWidth(500)  # TODO: Sometimes fontMetrics.boundingRect returns an incorrect width?
             painter.drawText(text_bounds, text)
         else:
             text_bounds = QRectF()
@@ -769,7 +768,8 @@ class MainWidget(QWidget):
         self.param_update_delay = parameterTypes.SliderParameter(
             name='Update Delay [ms]', limits=[100, 10000], default=1000, step=50
         )
-        self.param_update_delay.setValue(1000)  # TODO: Why does this not happen by default?
+        # Not sure why this doesn't happen by default
+        self.param_update_delay.setValue(self.param_update_delay.defaultValue())
         self.param_sim_step_idx = parameterTypes.SimpleParameter(
             name='Simulation Step', type='int', default=0, readonly=True
         )
