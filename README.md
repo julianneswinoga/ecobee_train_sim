@@ -2,6 +2,9 @@
 
 ## How to Run
 ```console
-$ python3 -m pip install --upgrade requirements.txt
+$ python3.10 -m pip install requirements.txt
 $ ./main.py
 ```
+
+## Video Demo
+![](media/video_demo.gif)
