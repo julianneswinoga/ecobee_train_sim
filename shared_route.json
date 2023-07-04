@@ -1,0 +1,18 @@
+{
+    "tracks": [
+        { "from": 1, "to": 2, "track_id": 200, "train_id": 81,"train_signals": { "90": { "junct_id": 2, "state": "red" } }},
+        { "from": 2, "to": 3, "track_id": 201, "train_signals": { "91": { "junct_id": 3, "state": "red" } } },
+        { "from": 3, "to": 4, "track_id": 202, "train_signals": { "92": { "junct_id": 4, "state": "red" } } },
+        { "from": 4, "to": 5, "track_id": 203, "train_signals": { "93": { "junct_id": 5, "state": "red" } } },
+        { "from": 5, "to": 6, "track_id": 204, "train_signals": { "94": { "junct_id": 6, "state": "red" } } },
+        { "from": 6, "to": 7, "track_id": 205 },
+        { "from": 10, "to": 11, "track_id": 206, "train_id": 80 },
+        { "from": 11, "to": 2, "track_id": 207, "train_signals": { "95": { "junct_id": 2, "state": "red" } } },
+        { "from": 6, "to": 16, "track_id": 216 },
+        { "from": 16, "to": 17, "track_id": 217 }
+    ],
+    "trains": {
+        "80": { "dest_junction": 17, "facing_junction": 11 },
+        "81": { "dest_junction": 7, "facing_junction": 2 }
+    }
+}

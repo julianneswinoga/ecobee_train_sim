@@ -402,8 +402,7 @@ class Simulation:
             for train_signal in track.train_signals:
                 signal_on_route = train_signal.attached_junction in junctions_on_route
                 signal_not_excluded = train_signal not in exclude_signals
-                signal_not_behind_train = train_signal.attached_junction != junction_behind_train
-                if signal_on_route and signal_not_excluded and signal_not_behind_train:
+                if signal_on_route and signal_not_excluded:
                     train_signal.signal_state = False
                     train_signals_set.add(train_signal)
         # Now go through all the tracks and set their signals to green
