@@ -289,29 +289,48 @@ class Simulation:
         :param train: Train to get the route for
         :return: List of junction on the train's route
         """
-        junctions_on_route: Set[Junction] = set()
+        edge_tups_on_route: List[Tuple[Junction, Junction]] = []
         for edge_tup in self.graph.edges:
             track: Track = self.graph.edges[edge_tup]['object']
             edge_has_route = train in track.trains_routed_along_track
             train_on_edge = train == track.train  # The current edge isn't included in the route
             if edge_has_route or train_on_edge:
-                junctions_on_route.add(edge_tup[0])
-                junctions_on_route.add(edge_tup[1])
+                edge_tups_on_route.append(edge_tup)
+        log.debug(f'{train}\'s edges on route: {edge_tups_on_route}')
 
-        # Sort the junctions in order from the train to the destination
-        # The first junction is the junction that isn't the trains currently facing direction
-        # i.e. the one behind the train
-        next_junction = self.get_junction_behind_train(train)
-        sorted_junctions_on_route = []
-        while len(junctions_on_route) != 0:
-            sorted_junctions_on_route.append(next_junction)
-            log.debug(f'Next junction in route is {next_junction}')
-            junctions_on_route.remove(next_junction)
-            # Find the next junction that is connected to what we just added
-            for junction in junctions_on_route:
-                if junction in self.graph.adj[next_junction]:
-                    next_junction = junction
+        sorted_junctions_on_route: List[Junction] = [self.get_junction_behind_train(train)]
+        edges_left_on_route = copy.copy(edge_tups_on_route)
+
+        while True:
+            next_junct: Optional[Junction] = None
+            last_junct = sorted_junctions_on_route[-1]
+            log.debug(f'Finding edge that contains {last_junct} from {edges_left_on_route}')
+            for route_edge in edges_left_on_route:
+                # After the first two edges are added, add up the next edge in the tuple
+                if last_junct in route_edge:
+                    if last_junct == route_edge[0]:
+                        next_junct = route_edge[1]
+                    elif last_junct == route_edge[1]:
+                        next_junct = route_edge[0]
                     break
+            if next_junct:
+                last_edge1 = (last_junct, next_junct)
+                last_edge2 = (next_junct, last_junct)
+                if last_edge1 in edges_left_on_route:
+                    log.debug(f'Removing {last_edge1}')
+                    edges_left_on_route.remove(last_edge1)
+                elif last_edge2 in edges_left_on_route:
+                    log.debug(f'Removing {last_edge2}')
+                    edges_left_on_route.remove(last_edge2)
+                else:
+                    raise IndexError(f'{last_edge1} or {last_edge2} not in {edges_left_on_route}?')
+                sorted_junctions_on_route.append(next_junct)
+            else:
+                raise IndexError(f'{last_junct} not in {edges_left_on_route}')
+            if next_junct == train.dest_junction:
+                # We're done when the last junction we added is the destination junction
+                break
+        log.info(f'{train} has sorted route junctions: {sorted_junctions_on_route}')
         return sorted_junctions_on_route
 
     def get_tracks_for_junction_path(self, junction_path: List[Junction]) -> List[Track]:
