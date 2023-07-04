@@ -334,6 +334,12 @@ class Simulation:
         return path_tracks
 
     def set_switches_for_train_route(self, train: Train, exclude_junctions: List[Junction]) -> List[Junction]:
+        """
+        Set each Junction's switches to a Trains' route
+        :param train: Train to set the switches for
+        :param exclude_junctions: List of Junctions to exclude from switching
+        :return: List of Junctions that were switched
+        """
         log.info(f'Setting switches for {train}, exclude={exclude_junctions}')
         junctions_on_route = self.get_sorted_junctions_for_route(train)
         log.debug(f'{train} route has sorted junctions {junctions_on_route}')
@@ -356,6 +362,14 @@ class Simulation:
         return junction_switches_set
 
     def set_signals_for_train_route(self, train: Train, exclude_signals: List[TrainSignal]) -> List[TrainSignal]:
+        """
+        Set Train Signals along a Trains' route. At each Junction in the route,
+        Signals along a route are switched green and every other Signal is switched
+        red (to prevent trains from blocking the route).
+        :param train: Train to set the Signals for
+        :param exclude_signals: List of Signals to exclude from switching
+        :return: List of Signals that were switched
+        """
         log.info(f'Setting signals for {train}, exclude={exclude_signals}')
         junctions_on_route = self.get_sorted_junctions_for_route(train)
         tracks_on_route = self.get_tracks_for_junction_path(junctions_on_route)
@@ -386,6 +400,12 @@ class Simulation:
         return list(train_signals_set)
 
     def set_track_route_for_train(self, train: Train):
+        """
+        Calculate a Trains route from its current facing Junction to its destination
+        Junction. The route is stored in the Tracks by telling them which Trains
+        are routed along that track.
+        :param train: Train to calculate and set the route for
+        """
         log.debug(f'Setting route from {train.facing_junction} to {train.dest_junction}')
         if train.facing_junction == train.dest_junction:
             log.info(f'{train} at destination, no routing to be done')
@@ -445,6 +465,12 @@ class Simulation:
         return all_trains
 
     def advance(self) -> bool:
+        """
+        Advance the Simulation one step. Move all trains forward, then set Signals
+        & Junction switches for each Train (priority given to lower ID Trains).
+        :return: True if more updates are required,
+            False if all trains have reached their destination.
+        """
         log.debug(f'Advancing simulation. step={self.step}')
 
         # Simple routing strategy:
@@ -504,6 +530,11 @@ class Simulation:
         return None
 
     def update_train(self, train: Train):
+        """
+        Move a Train along its trajectory, obeying Junction forks and Signals.
+        Update the route for its new location.
+        :param train: Train to update
+        """
         current_edge = self.get_edge_tup_for_train(train)
         next_junct1, next_junct2 = train.facing_junction.get_switch_state()
         if next_junct1 == next_junct2:  # Terminator
@@ -535,6 +566,12 @@ class Simulation:
         self.set_track_route_for_train(train)
 
     def move_train(self, old_track: Track, new_facing_junction: Junction):
+        """
+        Move a Train from one track to an adjacent Track, updating the Trains data.
+        :param old_track: Track that has the Train we want to move
+        :param new_facing_junction: The new facing Junction for the Train (must
+            be adjacent to the current facing Junction)
+        """
         train = old_track.train
         if train is None:
             raise TypeError(f'{old_track} does not have a train! Cannot move it facing {new_facing_junction}')

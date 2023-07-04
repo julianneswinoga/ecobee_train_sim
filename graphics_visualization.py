@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QHBoxLayout,
     QFileDialog,
+    QStyleOptionGraphicsItem,
 )
 from pyqtgraph.parametertree import Parameter, ParameterTree, parameterTypes
 
@@ -33,6 +34,11 @@ class QtEdge(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 2
 
     def __init__(self, source_node: 'QtNode', dest_node: 'QtNode'):
+        """
+        Base object for representing a graph edge
+        :param source_node: Source node for the edge
+        :param dest_node: Destination node for the edge
+        """
         super().__init__()
 
         self.connecting_line = QLineF()
@@ -45,6 +51,10 @@ class QtEdge(QGraphicsItem):
         self.adjust()
 
     def adjust(self):
+        """
+        Update our connecting line geometry to the current source and
+        destination Node positions
+        """
         if not self.source() or not self.dest():
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node to adjust')
             return
@@ -62,10 +72,20 @@ class QtEdge(QGraphicsItem):
         dest_point = line.p2() - QPointF((line.dx() * dest_offset) / length, (line.dy() * dest_offset) / length)
         self.connecting_line = QLineF(source_point, dest_point)
 
-    def boundingRect(self):
+    def boundingRect(self) -> QRectF:
+        """
+        Return this QGraphicsItems bounding rectangle
+        :return: Object bounding rectangle
+        """
         return self.bounds
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None):
+        """
+        Paint this QGraphicsItem
+        :param painter: QPainter instance for drawing
+        :param option: Styling options
+        :param widget: Optionally the widget that is being painted on
+        """
         if not self.source() or not self.dest():
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
@@ -79,14 +99,29 @@ class QtEdge(QGraphicsItem):
 
 class QtTrain(QGraphicsItem):
     def __init__(self, train_colour: Qt.GlobalColor, parent: QtEdge):
+        """
+        QGraphicsItem representing a Train. Must be a child of an Edge
+        :param train_colour: Colour of the Train
+        :param parent: Edge parent that the train currently resides on
+        """
         super().__init__(parent)
         self.train_colour: Qt.GlobalColor = train_colour
         self.bounds = QRectF()
 
-    def boundingRect(self):
+    def boundingRect(self) -> QRectF:
+        """
+        Return this QGraphicsItems bounding rectangle
+        :return: Object bounding rectangle
+        """
         return self.bounds
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None):
+        """
+        Paint this QGraphicsItem
+        :param painter: QPainter instance for drawing
+        :param option: Styling options
+        :param widget: Optionally the widget that is being painted on
+        """
         parent_item: QtTrack = self.parentItem()
         parent_center = parent_item.connecting_line.center()
         body_rect = QRectF(parent_center.x(), parent_center.y(), 30, 10)
@@ -133,6 +168,11 @@ class QtTrain(QGraphicsItem):
 
 
 def random_qcolor_generator(seed: int = 0) -> Generator[QColor, None, None]:
+    """
+    Generator that produces random QColors (but the same colours every time it is started)
+    :param seed: Optional seed for the PRNG
+    :return: Random QColor
+    """
     r = random.Random(seed)  # Create prng generator with a constant seed
     while True:
         yield QColor.fromRgbF(r.random(), r.random(), r.random(), 1.0)
@@ -144,6 +184,11 @@ track_line_colour_lookup: Dict[int, QColor] = {}
 
 
 def get_track_line_colour(track_line: Train) -> QColor:
+    """
+    Deterministically determine the colour of a Train
+    :param track_line: Train to determine the colour of
+    :return: track_lines colour
+    """
     global track_line_colour_lookup
     train_ident = track_line.ident
     if train_ident not in track_line_colour_lookup:
@@ -154,12 +199,24 @@ def get_track_line_colour(track_line: Train) -> QColor:
 
 class QtTrack(QtEdge):
     def __init__(self, source_junction: 'QtNode', dest_junction: 'QtNode', track: Track):
+        """
+        Superclass of base edge that represents a Track
+        :param source_junction: Source node
+        :param dest_junction: Destination node
+        :param track: Simulation Track object that this is representing
+        """
         super().__init__(source_junction, dest_junction)
 
         self.track = track
         self.qt_train: Optional[QtTrain] = None
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None):
+        """
+        Paint this QGraphicsItem
+        :param painter: QPainter instance for drawing
+        :param option: Styling options
+        :param widget: Optionally the widget that is being painted on
+        """
         if not self.source() or not self.dest():
             log.warning(f'No source ({self.source()}) or dest ({self.dest()}) node. Nothing to paint')
             return
@@ -251,6 +308,10 @@ class QtNode(QGraphicsItem):
     item_type = QGraphicsItem.UserType + 1
 
     def __init__(self, graph_widget: 'GraphWidget'):
+        """
+        Base object for representing a graph node
+        :param graph_widget: Widget representing the entire graph
+        """
         super().__init__()
 
         self.graph = weakref.ref(graph_widget)
@@ -266,11 +327,18 @@ class QtNode(QGraphicsItem):
         self.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.setZValue(-1)
 
-    def add_edge(self, edge):
+    def add_edge(self, edge: QtEdge):
+        """
+        Add an edge to this node
+        :param edge: Edge to add
+        """
         self._edge_list.append(weakref.ref(edge))
         edge.adjust()
 
     def calculate_forces(self):
+        """
+        Calculate all the forces acting on this node
+        """
         if not self.scene() or self.scene().mouseGrabberItem() is self:
             self._new_pos = self.pos()
             return
@@ -313,22 +381,41 @@ class QtNode(QGraphicsItem):
             min(max(self._new_pos.y(), scene_rect.top() + radius_offset), scene_rect.bottom() - radius_offset)
         )
 
-    def advance(self):
+    def advance(self, phase: int = 0) -> bool:
+        """
+        Set our new position from our latest calculation
+        :param phase: Optional phase number for animation
+        :return: True if our position changed, else False
+        """
         if self._new_pos == self.pos():
             return False
 
         self.setPos(self._new_pos)
         return True
 
-    def boundingRect(self):
+    def boundingRect(self) -> QRectF:
+        """
+        Return this QGraphicsItems bounding rectangle
+        :return: Object bounding rectangle
+        """
         return self.bounds
 
-    def shape(self):
+    def shape(self) -> QPainterPath:
+        """
+        Get the shape of this QGraphicsItem
+        :return: Shape of this QGraphicsItem
+        """
         path = QPainterPath()
         path.addEllipse(self.circle_bounds)
         return path
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None):
+        """
+        Paint this QGraphicsItem
+        :param painter: QPainter instance for drawing
+        :param option: Styling options
+        :param widget: Optionally the widget that is being painted on
+        """
         # Basic circle
         painter.setPen(Qt.NoPen)
         if option.state & QStyle.State_Sunken:
@@ -339,7 +426,13 @@ class QtNode(QGraphicsItem):
         painter.drawEllipse(self.circle_bounds)
         self.bounds = self.circle_bounds
 
-    def itemChange(self, change, value):
+    def itemChange(self, change: QGraphicsItem.GraphicsItemChange, value):
+        """
+        Called to notify that some part of the item's state has changed
+        :param change: Type of change
+        :param value: The new value
+        :return: Parent itemChange implementation
+        """
         if change == QGraphicsItem.ItemPositionChange:
             for edge in self._edge_list:
                 edge().adjust()
@@ -348,21 +441,37 @@ class QtNode(QGraphicsItem):
         return QGraphicsItem.itemChange(self, change, value)
 
     def mousePressEvent(self, event):
+        """
+        Called when the mouse presses this QGraphicsItem
+        :param event: The type of mouse event
+        """
         self.update()
         QGraphicsItem.mousePressEvent(self, event)
 
     def mouseReleaseEvent(self, event):
+        """
+        Called when the mouse releases this QGraphicsItem
+        :param event: The type of mouse event
+        """
         self.update()
         QGraphicsItem.mouseReleaseEvent(self, event)
 
 
 class QtJunction(QtNode):
     def __init__(self, graph_widget: 'GraphWidget', junction: Junction):
+        """
+        Superclass of base node that represents a Junction
+        :param graph_widget: Widget representing the entire graph
+        :param junction: Simulation Junction object that this is representing
+        """
         super().__init__(graph_widget)
         self.junction = junction
         self.fork_qt_notes: Optional[Tuple[weakref.ReferenceType['QtNode'], weakref.ReferenceType['QtNode']]] = None
 
     def update_fork_nodes(self):
+        """
+        Update our representation of which nodes the forks are connecting
+        """
         # Find the two edges from the fork identifiers
         qt_node_forks = []
         for qt_edge in self._edge_list:
@@ -388,11 +497,21 @@ class QtJunction(QtNode):
         self.fork_qt_notes = (qt_node_forks[0], qt_node_forks[1])
 
     def add_edge(self, edge):
+        """
+        Add an edge to this node
+        :param edge: Edge to add
+        """
         super().add_edge(edge)
         # Update our fork references if we're a Junction,
         self.update_fork_nodes()
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter: QPainter, option: QStyleOptionGraphicsItem, widget: Optional[QWidget] = None):
+        """
+        Paint this QGraphicsItem
+        :param painter: QPainter instance for drawing
+        :param option: Styling options
+        :param widget: Optionally the widget that is being painted on
+        """
         # Draw circle
         painter.setPen(Qt.NoPen)
         if option.state & QStyle.State_Sunken:
@@ -432,6 +551,9 @@ class QtJunction(QtNode):
 
 class GraphWidget(QGraphicsView):
     def __init__(self):
+        """
+        QGraphicsItem representing the whole graph
+        """
         super().__init__()
 
         self._timer_id = 0
@@ -449,6 +571,10 @@ class GraphWidget(QGraphicsView):
         self.simulation: Optional[Simulation] = None
 
     def set_simulation(self, new_simulation: Simulation):
+        """
+        Set a new simulation to represent the graph of
+        :param new_simulation: The new simulation graph
+        """
         self.simulation = new_simulation
 
         # Clear the scene
@@ -504,6 +630,13 @@ class GraphWidget(QGraphicsView):
         self.randomize_nodes()
 
     def advance_simulation(self) -> Tuple[bool, int]:
+        """
+        Advance the simulation one time step
+        :return: Tuple of (
+            True if the simulation doesn't need any more updates, False otherwise,
+            The current simulation time step index,
+            )
+        """
         if not self.simulation:
             log.warning(f'No simulation to advance: {self.simulation}')
             return False, -1
@@ -517,6 +650,10 @@ class GraphWidget(QGraphicsView):
         return sim_finished, self.simulation.step
 
     def repaint_all(self, force_paint=False):
+        """
+        Repaint all the items in the scene
+        :param force_paint: True if we want to repaint ourself as well, False otherwise
+        """
         if force_paint:
             self.repaint()
             self.scene().update()
@@ -527,15 +664,25 @@ class GraphWidget(QGraphicsView):
             self.scene().update()
 
     def randomize_nodes(self):
+        """
+        Randomize all the position of all the nodes in the scene
+        """
         for item in self.scene().items():
             if isinstance(item, QtNode):
                 item.setPos(-150 + random.randint(0, 300), -150 + random.randint(0, 300))
 
     def item_moved(self):
+        """
+        Called whenever an item in the scene is moved
+        """
         if not self._timer_id:
             self._timer_id = self.startTimer(1000 / 25)
 
     def keyPressEvent(self, event):
+        """
+        Called when a key is pressed on this Widget
+        :param event: The key event
+        """
         key = event.key()
 
         if key == Qt.Key_Plus:
@@ -548,6 +695,10 @@ class GraphWidget(QGraphicsView):
             QGraphicsView.keyPressEvent(self, event)
 
     def timerEvent(self, event):
+        """
+        Main widget timer that calculates forces and paints items
+        :param event: Timer event data
+        """
         # Just repaint everything for now. Don't really want to optimize the logic
         self.repaint_all()
 
@@ -567,10 +718,18 @@ class GraphWidget(QGraphicsView):
             self._timer_id = 0
 
     def wheelEvent(self, event):
+        """
+        Called when the mouse scrolls on this QGraphicsView
+        :param event: The mouse event data
+        """
         delta = event.angleDelta().y()
         self.scale_view(math.pow(2.0, -delta / 240.0))
 
     def scale_view(self, scale_factor: float):
+        """
+        Scale the graph's view box
+        :param scale_factor: Arbitrary number representing scale
+        """
         factor = self.transform().scale(scale_factor, scale_factor).mapRect(QRectF(0, 0, 1, 1)).width()
 
         if factor < 0.07 or factor > 100:
@@ -581,6 +740,9 @@ class GraphWidget(QGraphicsView):
 
 class MainWidget(QWidget):
     def __init__(self):
+        """
+        Main widget in the window
+        """
         super().__init__()
 
         self.graph_widget = GraphWidget()
@@ -612,6 +774,11 @@ class MainWidget(QWidget):
         self.h_layout.addWidget(self.graph_widget, 3)
 
     def param_change(self, param_root: Parameter, changes: List[Tuple[Parameter, str, Any]]):
+        """
+        Callback for when a parameter in the parameter tree has changed
+        :param param_root: Root parameter object
+        :param changes: List of parameter changes
+        """
         log.debug(f'Parameter changes:{changes}')
         for param, change, data in changes:
             if param == self.param_one_step and change == 'activated':
@@ -632,6 +799,9 @@ class MainWidget(QWidget):
                 log.error(f'Unknown parameter change:{param}')
 
     def step_simulation(self):
+        """
+        Advance the simulation one time step
+        """
         if not self.graph_widget.simulation:
             log.warning(f'No simulation to step: {self.graph_widget.simulation}')
             return
@@ -643,6 +813,10 @@ class MainWidget(QWidget):
             self.param_run_cont.setOpts(enabled=False)
 
     def set_simulation(self, simulation: Simulation):
+        """
+        Set a new simulation to represent the graph of
+        :param simulation: The new simulation graph
+        """
         self.graph_widget.set_simulation(simulation)
         for child_param in self.param_root.children():
             child_param.setValue(child_param.defaultValue())
@@ -651,6 +825,10 @@ class MainWidget(QWidget):
 
 class MainWindow(QMainWindow):
     def __init__(self, window_title: str):
+        """
+        Main Qt window
+        :param window_title: Base window title
+        """
         super().__init__()
 
         self.setMinimumSize(400, 400)
@@ -682,10 +860,17 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.main_widget)
 
     def set_window_title(self):
+        """
+        Update the window title based on the currently loaded file
+        """
         file_path_str = str(self.loaded_file_path) if self.loaded_file_path else 'No file loaded'
         self.setWindowTitle(f'{self.bare_window_title} - {file_path_str}')
 
     def load_file(self, file_path: Optional[Path] = None):
+        """
+        Load a simulation into the graph widget
+        :param file_path: Path to load a file from
+        """
         if file_path:
             log.debug(f'Loading provided path {file_path}')
         else:
@@ -702,9 +887,15 @@ class MainWindow(QMainWindow):
         self.set_window_title()
 
     def save_file(self):
+        """
+        Save the current graph to the same file
+        """
         self.save_file_as(self.loaded_file_path)
 
     def save_file_as(self, file_path: Optional[Path] = None):
+        """
+        Save the current graph to a potentially differently named file
+        """
         if not self.main_widget.graph_widget.simulation:
             log.warning(f'Cannot save with no simulation loaded')
             return
@@ -726,10 +917,20 @@ class MainWindow(QMainWindow):
 
 
 def exit_handler(*args):
+    """
+    Basic exit handler to stop the Qt event loop
+    :param args: Unused
+    """
     QApplication.quit()
 
 
 def excepthook(exc_type, exc_value, exc_tb):
+    """
+    Exception handler that provides a clean exit strategy
+    :param exc_type: Exception type
+    :param exc_value: Exception value
+    :param exc_tb: Exception traceback
+    """
     # Flush all logs
     for logger in logging.root.manager.loggerDict.values():
         for handler in logger.handlers:
@@ -742,11 +943,19 @@ def excepthook(exc_type, exc_value, exc_tb):
 
 class MainApp:
     def __init__(self, window_title: str):
+        """
+        Main Qt application
+        :param window_title: Base window title for the main window
+        """
         log.debug('Creating QApplication')
         self.app = QApplication()
         self.main_window = MainWindow(window_title)
 
     def run(self) -> int:
+        """
+        Start the application and Qt event loop. Does not return unless exited.
+        :return: Return code
+        """
         self.main_window.show()
         # Register a custom exception handler (so that logs can be flushed)
         sys.excepthook = excepthook
